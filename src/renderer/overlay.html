@@ -10,6 +10,8 @@
     <style>
       :root {
         --dim: 0.35;
+        /* 0 = no blur; 0.3..1 = blur strength. Set from the settings. */
+        --blur: 0;
       }
       html,
       body {
@@ -30,6 +32,17 @@
           rgba(10, 6, 18, calc(var(--dim) * 0.75)) 0%,
           rgba(10, 6, 18, var(--dim)) 70%,
           rgba(10, 6, 18, min(1, calc(var(--dim) * 1.15))) 100%
+        );
+      }
+      /* Blur mode: the system blurs the screen behind the window. This layer adds a strong extra blur of its own
+         (backdrop-filter, where the system has none) and a tint, so nothing behind is readable at full strength. */
+      body.blur #backdrop {
+        -webkit-backdrop-filter: blur(calc(var(--blur) * 60px)) saturate(1.2);
+        backdrop-filter: blur(calc(var(--blur) * 60px)) saturate(1.2);
+        background: radial-gradient(
+          ellipse at center,
+          rgba(16, 10, 28, calc(0.25 + var(--blur) * 0.35)) 0%,
+          rgba(10, 6, 18, calc(0.4 + var(--blur) * 0.45)) 100%
         );
       }
       #backdrop,

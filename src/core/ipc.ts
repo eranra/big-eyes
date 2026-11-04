@@ -37,6 +37,8 @@ export const IPC = {
   presenceFaces: 'big-eyes:presence-faces',
   /** overlay -> main: the eyes finished look-to-close; hide them. */
   requestClose: 'big-eyes:request-close',
+  /** renderer -> main: one line for the log file. */
+  log: 'big-eyes:log',
   /** about window -> main (invoke): app version, platform, update state. */
   getAbout: 'big-eyes:get-about',
   /** main -> about window: update state changed. */
@@ -111,6 +113,7 @@ export interface BigEyesApi {
   sendCameras(cameras: CameraInfo[]): void;
   sendCalibrated(reference: GazeReference): void;
   sendStatus(message: string): void;
+  sendLog(message: string): void;
   sendEyeArea(rect: { x: number; y: number; width: number; height: number }): void;
   requestClose(): void;
   preview(): void;

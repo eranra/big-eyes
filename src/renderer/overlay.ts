@@ -1,7 +1,7 @@
 import { EyeAnimator } from '../core/animator';
 import { averageReference } from '../core/attention';
 import type { BigEyesApi } from '../core/ipc';
-import { defaultSettings, type GazeReference, type Settings } from '../core/settings';
+import { blurActive, defaultSettings, type GazeReference, type Settings } from '../core/settings';
 import { drawEyes, eyeBounds, eyeLayout } from './draw';
 import { FaceTracker } from './tracker';
 
@@ -78,7 +78,7 @@ let presenceActive = false;
 api.onPresenceCheck((active) => {
   if (!tracker) return;
   presenceActive = active;
-  if (active) void tracker.start(settings.cameras);
+  if (active) void startTracker();
   else if (!visible) tracker.stop();
 });
 
@@ -97,14 +97,20 @@ function applySettings(next: Settings): void {
   settings = next;
   animator.apply(next);
   document.documentElement.style.setProperty('--dim', String(next.backgroundDim));
+  const blur = blurActive(next);
+  document.body.classList.toggle('blur', blur);
+  document.documentElement.style.setProperty('--blur', blur ? String(next.blurStrength) : '0');
   if (tracker && visible && cameraChanged) void startTracker();
   void reportCameras();
 }
 
 async function startTracker(): Promise<void> {
   if (!tracker) return;
+  const t0 = performance.now();
   await tracker.start(settings.cameras);
-  if (settings.showDebugInfo) console.log(`cameras opened: ${tracker.activeCameraLabels.join(' + ') || 'none'}`);
+  const opened = tracker.activeCameraLabels.join(' + ') || 'none';
+  api.sendLog(`cameras opened: ${opened} in ${((performance.now() - t0) / 1000).toFixed(1)}s`);
+  if (settings.showDebugInfo) console.log(`cameras opened: ${opened}`);
   await reportCameras();
 }
 

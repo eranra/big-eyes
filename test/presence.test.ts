@@ -134,3 +134,21 @@ Kernel Assertions: 0x104=USB`;
     expect(parsePmsetAssertions(withVideo, [4242])).toBe(true);
   });
 });
+
+describe('blur behind the eyes', () => {
+  it('default: blur only when the eyes replace the screen saver', async () => {
+    const { blurActive } = await import('../src/core');
+    const d = defaultSettings();
+    expect(d.blur).toBe('screensaver');
+    expect(blurActive(d)).toBe(false);
+    expect(blurActive({ ...d, screenSaver: 'replace' })).toBe(true);
+    expect(blurActive({ ...d, blur: 'always' })).toBe(true);
+    expect(blurActive({ ...d, blur: 'off', screenSaver: 'replace' })).toBe(false);
+  });
+
+  it('validates blur values', () => {
+    expect(normalizeSettings({ blur: 'heavy' }).blur).toBe('screensaver');
+    expect(normalizeSettings({ blurStrength: 5 }).blurStrength).toBe(1);
+    expect(normalizeSettings({ blurStrength: 0 }).blurStrength).toBe(0.3);
+  });
+});

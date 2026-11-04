@@ -5,6 +5,13 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **Blur behind the eyes**: off, when replacing the screen saver (default), or always, with a strength setting.
+  macOS uses the system blur, Windows 11 uses acrylic, Linux uses a strong tint.
+- A log file of app events (shows, hides and why, camera checks, locks, sleeps), for finding problems later:
+  `~/Library/Logs/Big Eyes/main.log` on macOS. No images or face data are written.
+
 ## [0.3.1] - 2026-11-04
 
 ### Fixed
