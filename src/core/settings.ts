@@ -81,6 +81,13 @@ export type EyePosition = 'center' | 'top-left' | 'top-right' | 'bottom-left' | 
  */
 export type MouseRule = 'onto-eyes' | 'any' | 'never';
 
+/**
+ * What happens with the system screen saver.
+ * - 'pause': while the screen saver runs, the eyes stay away (default).
+ * - 'replace': Big Eyes keeps the screen saver from starting; the eyes appear instead.
+ */
+export type ScreenSaverMode = 'pause' | 'replace';
+
 export interface BlinkSettings {
   /** How often the eyes blink: 0 = never, 1 = normal (every 2-5 s), 3 = very often. */
   rate: number;
@@ -93,6 +100,13 @@ export interface Settings {
   idleTimeout: number;
   /** Where the eyes sit on the screen. */
   position: EyePosition;
+  /**
+   * Do not show the eyes while someone looks at the screen, even without keyboard or mouse input
+   * (for example while reading). Uses a short camera check when the idle time is reached.
+   */
+  waitWhileWatched: boolean;
+  /** What happens with the system screen saver. */
+  screenSaver: ScreenSaverMode;
   /** What mouse movement does while the eyes are shown. */
   mouseRule: MouseRule;
   /** Close the eyes when the person keeps looking into them for `lookToCloseSeconds`. */
@@ -126,6 +140,10 @@ export interface Settings {
   openAtLogin: boolean;
   /** Show tracking numbers on screen, for tuning. */
   showDebugInfo: boolean;
+  /** Check GitHub for new versions at start and every few hours. */
+  checkForUpdates: boolean;
+  /** The newest version the user was already told about, so it is not announced again. */
+  lastAnnouncedVersion: string | null;
   /** Stop showing the eyes until resumed. */
   paused: boolean;
   attention: AttentionSettings;
@@ -331,6 +349,11 @@ export const MOUSE_RULES: ReadonlyArray<{ label: string; value: MouseRule }> = [
   { label: 'Mouse movement never closes them', value: 'never' },
 ];
 
+export const SCREEN_SAVER_MODES: ReadonlyArray<{ label: string; value: ScreenSaverMode }> = [
+  { label: 'Pause the eyes during the screen saver', value: 'pause' },
+  { label: 'Eyes replace the screen saver', value: 'replace' },
+];
+
 export const BLINK_RATE_PRESETS: ReadonlyArray<{ label: string; value: number }> = [
   { label: 'Never', value: 0 },
   { label: 'Rarely', value: 0.4 },
@@ -381,6 +404,8 @@ export function defaultSettings(): Settings {
   return {
     idleTimeout: 30,
     position: 'center',
+    waitWhileWatched: true,
+    screenSaver: 'pause',
     mouseRule: 'onto-eyes',
     lookToClose: false,
     lookToCloseSeconds: 2,
@@ -398,6 +423,8 @@ export function defaultSettings(): Settings {
     respectVideoPlayback: true,
     openAtLogin: false,
     showDebugInfo: false,
+    checkForUpdates: true,
+    lastAnnouncedVersion: null,
     paused: false,
     attention: {
       // The camera sits above the screen, so people look slightly down when they look at the screen.
@@ -535,6 +562,8 @@ export function normalizeSettings(input: unknown): Settings {
   const dm = d.mood;
   return {
     idleTimeout: num(s.idleTimeout, d.idleTimeout, 5, 24 * 3600),
+    waitWhileWatched: bool(s.waitWhileWatched, d.waitWhileWatched),
+    screenSaver: oneOf(s.screenSaver, ['pause', 'replace'] as const, d.screenSaver),
     position: oneOf(s.position, ['center', 'top-left', 'top-right', 'bottom-left', 'bottom-right'] as const, d.position),
     mouseRule: oneOf(s.mouseRule, ['onto-eyes', 'any', 'never'] as const, d.mouseRule),
     lookToClose: bool(s.lookToClose, d.lookToClose),
@@ -556,6 +585,11 @@ export function normalizeSettings(input: unknown): Settings {
     respectVideoPlayback: bool(s.respectVideoPlayback, d.respectVideoPlayback),
     openAtLogin: bool(s.openAtLogin, d.openAtLogin),
     showDebugInfo: bool(s.showDebugInfo, d.showDebugInfo),
+    checkForUpdates: bool(s.checkForUpdates, d.checkForUpdates),
+    lastAnnouncedVersion:
+      typeof s.lastAnnouncedVersion === 'string' && /^v?\d+\.\d+\.\d+/.test(s.lastAnnouncedVersion)
+        ? s.lastAnnouncedVersion.slice(0, 40)
+        : d.lastAnnouncedVersion,
     paused: bool(s.paused, d.paused),
     attention: {
       reference: {

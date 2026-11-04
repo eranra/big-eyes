@@ -3,7 +3,7 @@ import { chooseCameras, findCamera, isBuiltInCamera } from '../core/camera';
 import type { CameraInfo } from '../core/ipc';
 import type { BigEyesApi, DisplaySummary } from '../core/ipc';
 import type { Mood } from '../core/mood';
-import { defaultSettings, EYE_SHAPES, IRIS_PRESETS, MOUSE_RULES, POSITIONS, PUPIL_SHAPES, IRIS_STYLES, matchingTheme, THEMES, type LookSettings, type Settings } from '../core/settings';
+import { defaultSettings, EYE_SHAPES, IRIS_PRESETS, MOUSE_RULES, POSITIONS, PUPIL_SHAPES, SCREEN_SAVER_MODES, IRIS_STYLES, matchingTheme, THEMES, type LookSettings, type Settings } from '../core/settings';
 import { drawEyes } from './draw';
 import { FaceTracker } from './tracker';
 
@@ -113,8 +113,8 @@ const numberFields: Record<NumberField, (v: number) => string> = {
   backgroundDim: (v) => (v === 0 ? 'none' : `${Math.round(v * 100)}%`),
   idleTimeout: formatSeconds,
 };
-type BoolField = 'showCaptions' | 'respectVideoPlayback' | 'openAtLogin' | 'paused' | 'mirrorCamera' | 'showDebugInfo';
-const boolFields: BoolField[] = ['showCaptions', 'respectVideoPlayback', 'openAtLogin', 'paused', 'mirrorCamera', 'showDebugInfo'];
+type BoolField = 'showCaptions' | 'respectVideoPlayback' | 'openAtLogin' | 'paused' | 'mirrorCamera' | 'showDebugInfo' | 'waitWhileWatched';
+const boolFields: BoolField[] = ['showCaptions', 'respectVideoPlayback', 'openAtLogin', 'paused', 'mirrorCamera', 'showDebugInfo', 'waitWhileWatched'];
 
 let saveTimer = 0;
 function save(patch: Record<string, unknown>, delay = 150): void {
@@ -293,6 +293,9 @@ for (const rule of MOUSE_RULES) {
   row.append(input, text);
   mouseRules.append(row);
 }
+const screenSaverSelect = $<HTMLSelectElement>('screenSaver');
+for (const m of SCREEN_SAVER_MODES) screenSaverSelect.append(new Option(m.label, m.value));
+screenSaverSelect.addEventListener('change', () => save({ screenSaver: screenSaverSelect.value }, 0));
 const smileBack = $<HTMLInputElement>('smileBack');
 smileBack.addEventListener('change', () => save({ mood: { smileBack: smileBack.checked } }, 0));
 const lookToClose = $<HTMLInputElement>('lookToClose');
@@ -313,6 +316,7 @@ function renderBehavior(next: Settings): void {
   mouseRules.querySelectorAll<HTMLInputElement>('input').forEach((i) => (i.checked = i.value === next.mouseRule));
   lookToClose.checked = next.lookToClose;
   smileBack.checked = next.mood.smileBack;
+  screenSaverSelect.value = next.screenSaver;
   if (document.activeElement !== lookSeconds) lookSeconds.value = String(next.lookToCloseSeconds);
   (lookSeconds.nextElementSibling as HTMLOutputElement).value = `${next.lookToCloseSeconds}s`;
   lookSeconds.disabled = !next.lookToClose;

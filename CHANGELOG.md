@@ -5,6 +5,24 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-04
+
+### Added
+
+- **Wait while I'm looking** (on by default): before the eyes appear, a short camera check sees whether someone is
+  looking at the screen; if so, the eyes wait.
+- **Screen saver** setting: pause the eyes during the screen saver (default), or let the eyes replace it.
+- **About Big Eyes** window with the version, links to GitHub, and a Check for Updates button.
+- **Updates:** automatic checks at start and every 6 hours, and **Check for Updates…** in the menu. Windows and
+  Linux AppImage download and install updates; macOS and .deb show the new release with a link.
+
+- Idle detection ignores tiny mouse jitter (moves of a few pixels), which some wireless mice send while they lie still.
+
+### Security
+
+- Requests to Google's logging hosts (MediaPipe's built-in usage logger) are blocked in the app, in addition to the
+  page security policy.
+
 ## [0.2.0] - 2026-11-04
 
 ### Added

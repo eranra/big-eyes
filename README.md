@@ -61,6 +61,15 @@ chmod +x Big-Eyes-*.AppImage && ./Big-Eyes-*.AppImage
 
 On Debian or Ubuntu you can also install the `.deb`: `sudo apt install ./big-eyes_*.deb`.
 
+### Updates
+
+Big Eyes checks GitHub for new versions when it starts and every 6 hours (you can turn this off), or any time
+with **Check for Updates…** in the menu. **About Big Eyes** shows your version.
+
+- **Windows** and **Linux AppImage:** the update downloads in the background; choose **Restart Now** to install it.
+- **macOS** and **Linux .deb:** you get a message with a link to the new release. On macOS you can also copy the
+  one-line update command and paste it in Terminal.
+
 ### Uninstall
 
 - **macOS:** `curl -fsSL https://raw.githubusercontent.com/eranra/big-eyes/main/install.sh | bash -s -- --uninstall`, or drag the app to the Trash.
@@ -86,7 +95,10 @@ springy movement, expressive eyebrows, and wet-looking highlights.
 - By default, moving the mouse **onto the eyes** closes them; moving it elsewhere is fine.
   You can change this to *any mouse movement* or *never* (then only a key or click closes them).
 - Optional: **look into the eyes to close them.** Hold eye contact for a moment, a ring fills up, and they wink goodbye. 😉
+- **They wait while you're looking at the screen** — reading something without touching the keyboard doesn't wake them.
+  (A short camera check before they appear; you can turn this off.)
 - They don't take keyboard focus and don't appear while your screen is locked.
+- By default they stay away while the **screen saver** runs. Or choose *Eyes replace the screen saver*, and the eyes appear instead of it.
 - On macOS they also wait while a video or presentation is playing.
 
 ![Look into the eyes to close them](docs/images/goodbye.png)
@@ -108,6 +120,9 @@ Click the 👀 icon for quick choices, or open **Settings…** for everything, w
 | **Blinking** | How often (never … very often) and how fast (slow and sleepy … quick) | Normal |
 | **Closing** | Mouse onto the eyes, any mouse movement, or never; and *look into the eyes to close them* (1–10 s) | Mouse onto the eyes; look-to-close off |
 | **Show after** | 15 seconds … 10 minutes, or any time | 30 seconds |
+| **Wait while I'm looking** | Don't appear while someone is looking at the screen, even without keyboard or mouse use | On |
+| **Screen saver** | Pause the eyes during the screen saver, or let the eyes replace the screen saver | Pause |
+| **Updates** | Check for new versions automatically | On |
 | **Screens** | Built-in screen, main screen, all screens, or the ones you pick | Built-in screen |
 | **Cameras** | Built-in camera, system default, all cameras, or the ones you pick. With several cameras, the first is the main one: the eyes follow what it sees, and the others notice you when it can't | Built-in camera |
 | **Smiles** | Smile back when you smile at them; show or hide the mouth; lip color | On |
@@ -128,9 +143,10 @@ Settings are saved automatically and survive restarts and updates. They live in 
 
 ## 🔒 Privacy
 
-- 🖥️ **Everything stays on your computer.** The camera picture is analyzed locally by Google's open-source [MediaPipe](https://ai.google.dev/edge/mediapipe/solutions/vision/face_landmarker). Nothing is uploaded, and the app makes no network requests.
+- 🖥️ **Everything stays on your computer.** The camera picture is analyzed locally by Google's open-source [MediaPipe](https://ai.google.dev/edge/mediapipe/solutions/vision/face_landmarker). Nothing is uploaded.
+- 🌐 **The only network request is the update check** to github.com (you can turn it off). MediaPipe's built-in usage logging is blocked.
 - 🚫 **Nothing is recorded.** No pictures or videos are saved.
-- 💡 **The camera only runs while the eyes are on screen.** Your camera light shows it.
+- 💡 **The camera only runs while the eyes are on screen**, plus a 3-second check before they appear (if *Wait while I'm looking* is on). Your camera light shows it.
 - 🎙️ **No microphone.** Ever.
 
 Details: [docs/privacy.md](docs/privacy.md).
@@ -142,7 +158,7 @@ Details: [docs/privacy.md](docs/privacy.md).
 | The eyes don't smile when I look at them | Menu → **Calibrate Eye Contact…** |
 | The eyes look the wrong way | Menu → **Mirror Camera** |
 | The eyes close too easily | Menu → **Closing** → **Mouse movement never closes them** |
-| The eyes never appear | Check that **Pause** is off. On macOS, a video tab or call can hold them back (**Don't Show During Video**). |
+| The eyes never appear | Check that **Pause** is off. If you sit in front of the screen, **Wait While I'm Looking** holds them back — that's on purpose. On macOS, a video tab or call can hold them back (**Don't Show During Video**). |
 | "I can't see you" | Allow camera access: macOS **System Settings → Privacy & Security → Camera**; Windows **Settings → Privacy → Camera**. |
 | Wrong camera or screen | Menu → **Cameras** / **Screens** |
 | The eyes don't smile back | Smile clearly while looking at them. Check **Smile Back When You Smile** in the menu |

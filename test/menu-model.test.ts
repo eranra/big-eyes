@@ -64,6 +64,14 @@ describe('tray menu model', () => {
     });
   });
 
+  it('has the waiting and screen saver options', () => {
+    const menu = buildMenuModel(defaultSettings(), [], [], 'darwin');
+    expect(find(menu, "Wait While I'm Looking at the Screen").checked).toBe(true);
+    const saver = find(menu, 'Screen Saver');
+    expect(checked(saver)).toEqual(['Pause the eyes during the screen saver']);
+    expect(find(saver.submenu!, 'Eyes replace the screen saver').action).toEqual({ kind: 'patch', patch: { screenSaver: 'replace' } });
+  });
+
   it('pause toggles', () => {
     const menu = buildMenuModel(mergeSettings(defaultSettings(), { paused: true }), [], [], 'linux');
     expect(find(menu, 'Paused').action).toEqual({ kind: 'patch', patch: { paused: false } });

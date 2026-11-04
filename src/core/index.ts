@@ -8,3 +8,6 @@ export * from './mood';
 export * from './settings';
 export * from './spring';
 export * from './camera';
+export * from './presence';
+export * from './update';
+export * from './activity';

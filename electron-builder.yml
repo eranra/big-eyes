@@ -16,6 +16,13 @@ asarUnpack:
   - build/renderer/wasm/**
   - build/renderer/models/**
 icon: assets/icons/icon.png
+# Where releases live. electron-builder uploads there, and writes app-update.yml into the app so
+# electron-updater checks the same place.
+publish:
+  - provider: github
+    owner: eranra
+    repo: big-eyes
+    releaseType: draft
 
 mac:
   category: public.app-category.entertainment

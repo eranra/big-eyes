@@ -4,13 +4,19 @@ import { linuxAutostartEntry, parsePmsetAssertions } from '../src/main/system';
 describe('pmset parsing', () => {
   const sample = (display: number, noDisplay: number): string => `Assertion status system-wide:
    BackgroundTask                 0
-   ApplePushServiceTask           0
    UserIsActive                   1
    PreventUserIdleDisplaySleep    ${display}
-   PreventSystemSleep             0
    NoDisplaySleepAssertion        ${noDisplay}
 Listed by owning process:
-   pid 123(coreaudiod): [0x0001] 00:10:00 PreventUserIdleSystemSleep named: "com.apple.audio"`;
+   pid 123(coreaudiod): [0x0001] 00:10:00 PreventUserIdleSystemSleep named: "com.apple.audio"
+${display ? '   pid 900(QuickTime Player): [0x0002] 00:01:00 PreventUserIdleDisplaySleep named: "playing"\n' : ''}${
+    noDisplay ? '   pid 901(Zoom): [0x0003] 00:01:00 NoDisplaySleepAssertion named: "call"\n' : ''
+  }`;
+
+  it('summary only (older macOS output)', () => {
+    expect(parsePmsetAssertions('Assertion status system-wide:\n   PreventUserIdleDisplaySleep    1\n')).toBe(true);
+    expect(parsePmsetAssertions('Assertion status system-wide:\n   PreventUserIdleDisplaySleep    0\n')).toBe(false);
+  });
 
   it('detects display sleep assertions', () => {
     expect(parsePmsetAssertions(sample(0, 0))).toBe(false);

@@ -50,6 +50,43 @@ Only one overlay window (the one on the main screen, when it is selected) opens 
 It sends the faces to the main process, which forwards them to the overlays on the other screens.
 Each overlay runs its own animator, so all screens show the same behavior.
 
+## Idle time and mouse jitter
+
+`ActivityClock` (`src/core/activity.ts`) keeps Big Eyes' own idle time. The system idle counter resets on any input
+event, including 1-3 pixel wobbles from some wireless mice. The clock samples the pointer 10 times per second:
+more than 8 pixels of travel within 2 seconds is mouse use; a system reset without any pointer movement is a key
+press or click; anything else is jitter and is ignored.
+
+## Waiting while someone looks at the screen
+
+`PresenceCheck` (`src/core/presence.ts`). When the idle time is reached and `waitWhileWatched` is on, the main
+process does not show the eyes at once. It asks the tracker overlay (hidden, but loaded) to open the cameras for up
+3 seconds of frames, after a 1-second warm-up (first frames are often dark) and with a 15-second limit if the camera
+never answers. A face from the main camera with the head within about 35° of the screen counts as "watching".
+Watching: wait and check again after 15 seconds. Nobody: show the eyes. Camera error: show the eyes. Any input resets it.
+
+## Screen saver
+
+- `pause` (default): while `ScreenSaverEngine` / `legacyScreenSaver` (macOS) or a `.scr` process (Windows) runs,
+  showing is blocked, and the eyes close if they were open.
+- `replace`: `powerSaveBlocker.start('prevent-display-sleep')` keeps the screen saver and display sleep away while
+  Big Eyes runs. The "don't show during video" check ignores this blocker, because it is our own.
+
+## Updates
+
+`src/core/update.ts` decides the update path; `src/main/updater.ts` runs it. Releases on GitHub include
+electron-builder's `latest*.yml` files, and the app contains `app-update.yml` (written at packaging time).
+
+| System | How |
+|---|---|
+| Windows (NSIS), Linux AppImage | `electron-updater` downloads in the background, then "Restart Now" installs it |
+| macOS | Reads `releases/latest/download/latest-mac.yml`; shows the release link and the install command. (Squirrel.Mac needs a Developer ID signature, which ad-hoc builds do not have.) |
+| Linux .deb | Reads `latest-linux.yml`; shows the release link |
+| `npm start` | No checks |
+
+Automatic checks run 10 seconds after start and every 6 hours, and announce each version once
+(`lastAnnouncedVersion`). **Check for Updates…** always shows the result.
+
 ## Several cameras
 
 The tracker opens every chosen camera, each with its own MediaPipe landmarker, and processes them in turn

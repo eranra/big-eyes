@@ -31,11 +31,38 @@ export const IPC = {
   preview: 'big-eyes:preview',
   /** overlay -> main: where the eyes are now, in window coordinates (CSS pixels). */
   eyeArea: 'big-eyes:eye-area',
+  /** main -> tracker overlay: open the camera for a short presence check (true) or stop it (false). */
+  presenceCheck: 'big-eyes:presence-check',
+  /** tracker overlay -> main: faces seen during a presence check, or an error. */
+  presenceFaces: 'big-eyes:presence-faces',
   /** overlay -> main: the eyes finished look-to-close; hide them. */
   requestClose: 'big-eyes:request-close',
+  /** about window -> main (invoke): app version, platform, update state. */
+  getAbout: 'big-eyes:get-about',
+  /** main -> about window: update state changed. */
+  aboutUpdate: 'big-eyes:about-update',
+  /** about window -> main: check for updates now. */
+  checkUpdates: 'big-eyes:check-updates',
+  /** about / settings window -> main: open one of our GitHub links in the browser. */
+  openLink: 'big-eyes:open-link',
   /** settings window -> main: start eye contact calibration. */
   requestCalibrate: 'big-eyes:request-calibrate',
 } as const;
+
+export interface AboutInfo {
+  version: string;
+  electron: string;
+  chrome: string;
+  platform: string;
+  arch: string;
+  /** How updates work on this system, in one sentence. */
+  updateMode: string;
+  /** Short update status text, for example "You're up to date" or "Version 0.3.0 is available". */
+  updateStatus: string;
+  repoUrl: string;
+  license: string;
+  author: string;
+}
 
 export interface CameraInfo {
   deviceId: string;
@@ -77,6 +104,8 @@ export interface BigEyesApi {
   onVisibility(listener: (visible: boolean) => void): void;
   onCalibrate(listener: () => void): void;
   onFaces(listener: (message: FacesMessage) => void): void;
+  onPresenceCheck(listener: (active: boolean) => void): void;
+  sendPresenceFaces(message: { faces: FacesMessage['faces']; error?: string }): void;
   onStatus(listener: (message: string) => void): void;
   sendFaces(message: FacesMessage): void;
   sendCameras(cameras: CameraInfo[]): void;
@@ -85,5 +114,9 @@ export interface BigEyesApi {
   sendEyeArea(rect: { x: number; y: number; width: number; height: number }): void;
   requestClose(): void;
   preview(): void;
+  getAbout(): Promise<AboutInfo>;
+  onAboutUpdate(listener: (info: AboutInfo) => void): void;
+  checkUpdates(): void;
+  openLink(url: string): void;
   calibrate(): void;
 }

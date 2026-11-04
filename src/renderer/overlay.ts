@@ -50,6 +50,7 @@ const tracker = isTracker ? new FaceTracker(new URL('./', location.href).toStrin
 if (tracker) {
   let lastLog = 0;
   tracker.onFaces = (faces, time) => {
+    if (presenceActive && !visible) api.sendPresenceFaces({ faces });
     if (settings.showDebugInfo && time - lastLog > 1) {
       lastLog = time;
       const f = faces[0];
@@ -61,11 +62,25 @@ if (tracker) {
     api.sendFaces({ faces, time });
   };
   tracker.onError = (message) => {
+    if (presenceActive && !visible) {
+      api.sendPresenceFaces({ faces: [], error: message });
+      return;
+    }
     api.sendStatus(message);
     showMessage("I can't see you", 4000);
   };
 }
 api.onFaces(({ faces, time }) => animator.ingest(faces, time));
+
+// Presence check: while the eyes are hidden, the main process can ask for a short camera look
+// ("is someone reading the screen?"). Only the tracker window does this.
+let presenceActive = false;
+api.onPresenceCheck((active) => {
+  if (!tracker) return;
+  presenceActive = active;
+  if (active) void tracker.start(settings.cameras);
+  else if (!visible) tracker.stop();
+});
 
 function resize(): void {
   const dpr = window.devicePixelRatio || 1;
@@ -118,6 +133,7 @@ function setVisible(next: boolean): void {
     frameHandle = requestAnimationFrame(frame);
   } else {
     tracker?.stop();
+    presenceActive = false;
     calibrationEnd = null;
     // Keep drawing during the fade-out, then stop.
     setTimeout(() => {

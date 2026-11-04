@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:" />
+    <title>About Big Eyes</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #15121c;
+        --text: #ece8f4;
+        --muted: #9a93ab;
+        --accent: #8c7cf0;
+        --line: #2e2840;
+        font-family: ui-rounded, 'SF Pro Rounded', system-ui, -apple-system, 'Segoe UI', sans-serif;
+        font-size: 13px;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: radial-gradient(ellipse at 50% 22%, #2a2140 0%, var(--bg) 62%);
+        color: var(--text);
+        user-select: none;
+      }
+      body {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        padding: 6px 22px 18px;
+        box-sizing: border-box;
+      }
+      canvas {
+        width: 100%;
+        height: 150px;
+      }
+      h1 {
+        margin: 0;
+        font-size: 24px;
+        font-weight: 700;
+      }
+      .tagline {
+        margin: 4px 0 10px;
+        color: var(--muted);
+      }
+      .version {
+        font-size: 14px;
+        font-weight: 600;
+      }
+      .details {
+        margin: 2px 0 12px;
+        color: var(--muted);
+        font-size: 11px;
+        user-select: text;
+      }
+      .status {
+        min-height: 18px;
+        margin-bottom: 10px;
+      }
+      .status.new {
+        color: #b9f0a8;
+        font-weight: 600;
+      }
+      .buttons {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        justify-content: center;
+        margin-bottom: 12px;
+      }
+      button {
+        font: inherit;
+        color: var(--text);
+        background: #2a2438;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 6px 12px;
+        cursor: pointer;
+      }
+      button.primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #120f19;
+        font-weight: 600;
+      }
+      .links {
+        display: flex;
+        gap: 14px;
+        justify-content: center;
+      }
+      .links a {
+        color: var(--accent);
+        text-decoration: none;
+        cursor: pointer;
+      }
+      .links a:hover {
+        text-decoration: underline;
+      }
+      .small {
+        margin-top: auto;
+        padding-top: 10px;
+        color: var(--muted);
+        font-size: 11px;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="eyes" aria-hidden="true"></canvas>
+    <h1>Big Eyes</h1>
+    <p class="tagline">Friendly eyes that look back at you.</p>
+    <div class="version" id="version"></div>
+    <div class="details" id="details"></div>
+    <div class="status" id="status" role="status"></div>
+    <div class="buttons">
+      <button id="check" class="primary">Check for Updates</button>
+    </div>
+    <div class="links">
+      <a data-link="repo">GitHub</a>
+      <a data-link="releases">Release Notes</a>
+      <a data-link="issues">Report a Problem</a>
+    </div>
+    <div class="small" id="license"></div>
+    <script src="about.js"></script>
+  </body>
+</html>

@@ -1,6 +1,7 @@
 import {
   app,
   BrowserWindow,
+  powerSaveBlocker,
   ipcMain,
   Menu,
   nativeImage,
@@ -9,6 +10,7 @@ import {
   protocol,
   screen,
   session,
+  shell,
   systemPreferences,
   Tray,
   type Display,
@@ -18,11 +20,17 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { IdleMonitor, pointInRects } from '../core/idle';
+import { PresenceCheck } from '../core/presence';
+import { ActivityClock } from '../core/activity';
+import type { FaceObservation } from '../core/face';
 import { IPC, type CameraInfo, type DisplaySummary, type FacesMessage, type OverlayRole } from '../core/ipc';
 import { selectDisplays, type GazeReference, type Settings } from '../core/settings';
 import { buildMenuModel, type MenuAction, type MenuNode } from './menu-model';
 import { SettingsStore } from './store';
-import { displaySleepPrevented, setLinuxAutostart } from './system';
+import { displaySleepPrevented, screenSaverRunning, setLinuxAutostart } from './system';
+import { Updater, updateMenuLabel, type UpdateState } from './updater';
+import { ISSUES_URL, RELEASES_URL, REPO_URL } from '../core/update';
+import type { AboutInfo } from '../core/ipc';
 
 // ---- Startup --------------------------------------------------------------------------------------
 
@@ -36,7 +44,7 @@ const INTERNAL_SCREEN_ONLY = args.has('--internal-screen-only');
 const GUIDED_TEST = args.has('--guided-test');
 const CAMERA_NAME = process.argv.find((a) => a.startsWith('--camera-name='))?.slice('--camera-name='.length);
 const debugLog = (...items: unknown[]): void => {
-  if (FORCE_DEBUG) console.log('[main]', ...items);
+  if (FORCE_DEBUG) console.log(`[main ${(performance.now() / 1000).toFixed(1)}s]`, ...items);
 };
 const snapshotIndex = process.argv.indexOf('--snapshot');
 const SNAPSHOT_DIR = snapshotIndex > 0 ? process.argv[snapshotIndex + 1] : undefined;
@@ -80,10 +88,20 @@ let overlays: Overlay[] = [];
 /** Extra space around the eyes (pixels) that also counts as "inside". */
 const EYE_AREA_MARGIN = 24;
 let settingsWindow: BrowserWindow | null = null;
+let aboutWindow: BrowserWindow | null = null;
+let updater: Updater | null = null;
 let cameras: CameraInfo[] = [];
 let screenLocked = false;
 let checking = false;
 const idle = new IdleMonitor(60);
+const presence = new PresenceCheck();
+/** Idle clock that ignores tiny mouse jitter (see src/core/activity.ts). */
+const activity = new ActivityClock(performance.now() / 1000);
+/** Id of the power save blocker that keeps the screen saver away ("replace" mode), or null. */
+let screenSaverBlocker: number | null = null;
+let screenSaverActive = false;
+let lastScreenSaverCheck = 0;
+let lastActivityLog = 0;
 let lastCursor = { x: 0, y: 0 };
 
 const nowSeconds = (): number => performance.now() / 1000;
@@ -126,8 +144,19 @@ function isOwnPage(url: string): boolean {
   return url.startsWith('app://bundle/');
 }
 
+/**
+ * Hosts the app must never contact. MediaPipe has a built-in usage logger that posts to Google; Big Eyes
+ * promises no tracking, so these requests are cancelled for every window (the page security policy also
+ * blocks them). The only network use of the app is the update check to github.com.
+ */
+const BLOCKED_HOSTS = ['odml.pa.googleapis.com', 'play.googleapis.com', 'firebaselogging-pa.googleapis.com'];
+
 function restrictPermissions(): void {
   const ses = session.defaultSession;
+  ses.webRequest.onBeforeRequest({ urls: BLOCKED_HOSTS.map((h) => `*://${h}/*`) }, (details, callback) => {
+    debugLog('blocked a request to', new URL(details.url).host);
+    callback({ cancel: true });
+  });
   ses.setPermissionRequestHandler((webContents, permission, callback, details) => {
     const mediaTypes = 'mediaTypes' in details ? (details.mediaTypes ?? []) : [];
     const ok = isOwnPage(webContents.getURL()) && permission === 'media' && !mediaTypes.includes('audio');
@@ -271,7 +300,9 @@ function hideOverlays(): void {
 }
 
 function show(): void {
-  if (idle.forceShow(nowSeconds(), powerMonitor.getSystemIdleTime())) showOverlays();
+  presence.reset();
+  const now = nowSeconds();
+  if (idle.forceShow(now, activity.sample(now, powerMonitor.getSystemIdleTime(), screen.getCursorScreenPoint()))) showOverlays();
 }
 
 function hide(): void {
@@ -280,33 +311,100 @@ function hide(): void {
 
 // ---- Idle loop ------------------------------------------------------------------------------------
 
+/** Our own process ids (main, GPU, renderers), so pmset does not count our own screen saver blocker. */
+function ownPids(): number[] {
+  return app.getAppMetrics().map((m) => m.pid);
+}
+
+/** "Replace the screen saver" mode: hold a display-sleep blocker, which also keeps the screen saver away. */
+function applyScreenSaverMode(s: Settings): void {
+  const want = s.screenSaver === 'replace' && !s.paused;
+  if (want && screenSaverBlocker === null) {
+    screenSaverBlocker = powerSaveBlocker.start('prevent-display-sleep');
+    debugLog('screen saver: blocked (eyes replace it)');
+  } else if (!want && screenSaverBlocker !== null) {
+    powerSaveBlocker.stop(screenSaverBlocker);
+    screenSaverBlocker = null;
+    debugLog('screen saver: allowed');
+  }
+}
+
+function setPresenceCamera(active: boolean): void {
+  for (const o of overlays) if (o.role.isTracker && !o.window.isDestroyed()) o.window.webContents.send(IPC.presenceCheck, active);
+}
+
 async function checkIdle(): Promise<void> {
   if (checking) return;
   checking = true;
   try {
     const s = store.get();
     idle.timeout = s.idleTimeout;
-    const idleSeconds = powerMonitor.getSystemIdleTime();
     const now = nowSeconds();
+    const cursor = screen.getCursorScreenPoint();
+    const systemIdle = powerMonitor.getSystemIdleTime();
+    // Filtered idle time: tiny mouse jitter does not count as input.
+    const idleSeconds = activity.sample(now, systemIdle, cursor);
+    if (FORCE_DEBUG && now - lastActivityLog >= 10) {
+      lastActivityLog = now;
+      debugLog(`activity: idle=${idleSeconds.toFixed(1)}s system=${systemIdle}s`);
+    }
     let pointerMoved = false;
     let pointerInEyes = false;
     if (idle.isShowing) {
-      const cursor = screen.getCursorScreenPoint();
-      pointerMoved = Math.abs(cursor.x - lastCursor.x) + Math.abs(cursor.y - lastCursor.y) > 2;
+      // Only real mouse movement (more than the jitter threshold) counts.
+      pointerMoved = activity.pointerActive() && Math.abs(cursor.x - lastCursor.x) + Math.abs(cursor.y - lastCursor.y) > 0;
       lastCursor = cursor;
       const areas = overlays.flatMap((o) => (o.eyeArea ? [o.eyeArea] : []));
       pointerInEyes = pointInRects(cursor, areas, EYE_AREA_MARGIN);
     }
-    let blocked = s.paused || screenLocked || overlays.length === 0;
-    // Asking for video playback is slower, so do it only right before showing.
-    if (!blocked && !idle.isShowing && idleSeconds >= idle.timeout && s.respectVideoPlayback) {
-      blocked = await displaySleepPrevented();
+    // Screen saver ("pause" mode): check about once a second while idle; it never runs while you type.
+    if (s.screenSaver === 'pause' && idleSeconds >= Math.min(idle.timeout, 5) && now - lastScreenSaverCheck >= 1) {
+      lastScreenSaverCheck = now;
+      const running = await screenSaverRunning();
+      if (running !== screenSaverActive) debugLog(`screen saver ${running ? 'started' : 'stopped'}`);
+      screenSaverActive = running;
+    } else if (s.screenSaver !== 'pause' || idleSeconds < 1) {
+      screenSaverActive = false;
     }
+    let blocked = s.paused || screenLocked || overlays.length === 0 || screenSaverActive;
+    const due = !blocked && !idle.isShowing && idleSeconds >= idle.timeout;
+    // Asking for video playback is slower, so do it only right before showing.
+    if (due && s.respectVideoPlayback) blocked = await displaySleepPrevented(ownPids());
+
+    // "Wait while someone looks at the screen": before showing, take a short look with the camera.
+    if (idleSeconds < idle.timeout && presence.phase !== 'idle') {
+      debugLog(`presence: reset by input (idle=${idleSeconds.toFixed(1)}s, system=${systemIdle}s, phase=${presence.phase})`);
+      presence.reset();
+      setPresenceCamera(false);
+    }
+    if (due && !blocked && s.waitWhileWatched) {
+      if (presence.phase === 'checking') {
+        const result = presence.result(now);
+        if (result === null) return;
+        setPresenceCamera(false);
+        if (result === 'watched') {
+          debugLog('presence: someone is looking at the screen, the eyes wait');
+          return;
+        }
+        debugLog('presence: nobody looking, showing the eyes');
+      } else if (presence.due(now)) {
+        debugLog('presence: checking with the camera');
+        presence.start(now);
+        setPresenceCamera(true);
+        return;
+      } else {
+        return; // someone was there; wait for the next check
+      }
+    }
+
     if (STAY && idle.isShowing) return;
     const event = idle.update({ idleSeconds, now, blocked, pointerMoved, pointerInEyes, mouseRule: s.mouseRule });
-    if (event) debugLog(`idle event: ${event}${event === 'hide' ? ` (${idle.lastHideReason})` : ''} idle=${idleSeconds}s`);
+    if (event) debugLog(`idle event: ${event}${event === 'hide' ? ` (${idle.lastHideReason})` : ''} idle=${idleSeconds.toFixed(1)}s system=${systemIdle}s`);
     if (event === 'show') showOverlays();
-    if (event === 'hide') hideOverlays();
+    if (event === 'hide') {
+      presence.reset();
+      hideOverlays();
+    }
   } finally {
     checking = false;
   }
@@ -357,6 +455,15 @@ function runAction(action: MenuAction): void {
       // Camera names are read by a page. The settings window asks for camera access and refreshes the list.
       openSettingsWindow();
       break;
+    case 'about':
+      openAboutWindow();
+      break;
+    case 'checkUpdates':
+      void updater?.check(true);
+      break;
+    case 'update':
+      updater?.act();
+      break;
     case 'quit':
       app.quit();
       break;
@@ -365,7 +472,9 @@ function runAction(action: MenuAction): void {
 
 function updateTray(): void {
   if (!tray) return;
-  const menu = Menu.buildFromTemplate(toElectronMenu(buildMenuModel(store.get(), cameras, displaySummaries())));
+  const label = updater ? updateMenuLabel(updater.state) : null;
+  const model = buildMenuModel(store.get(), cameras, displaySummaries(), process.platform, label);
+  const menu = Menu.buildFromTemplate(toElectronMenu(model));
   tray.setContextMenu(menu);
   const s = store.get();
   tray.setToolTip(s.paused ? 'Big Eyes (paused)' : 'Big Eyes');
@@ -374,6 +483,85 @@ function updateTray(): void {
 function calibrate(): void {
   show();
   for (const { window } of overlays) window.webContents.send(IPC.calibrate);
+}
+
+// ---- About window ---------------------------------------------------------------------------------
+
+const PLATFORM_NAMES: Partial<Record<NodeJS.Platform, string>> = { darwin: 'macOS', win32: 'Windows', linux: 'Linux' };
+
+function updateStatusText(state: UpdateState): string {
+  switch (state.kind) {
+    case 'checking':
+      return 'Checking for updates…';
+    case 'up-to-date':
+      return "You're up to date.";
+    case 'available':
+      return `Version ${state.version} is available.`;
+    case 'downloading':
+      return `Downloading version ${state.version}… ${state.percent}%`;
+    case 'ready':
+      return `Version ${state.version} is ready. Restart to update.`;
+    case 'error':
+      return 'Could not check for updates.';
+    default:
+      return '';
+  }
+}
+
+function aboutInfo(): AboutInfo {
+  const channel = updater?.channel ?? 'none';
+  const updateMode =
+    channel === 'auto'
+      ? 'Updates install automatically'
+      : channel === 'none'
+        ? 'Development build'
+        : 'You are told about new versions';
+  return {
+    version: app.getVersion(),
+    electron: process.versions.electron ?? '',
+    chrome: process.versions.chrome ?? '',
+    platform: PLATFORM_NAMES[process.platform] ?? process.platform,
+    arch: process.arch,
+    updateMode,
+    updateStatus: updater ? updateStatusText(updater.state) : '',
+    repoUrl: REPO_URL,
+    license: 'Apache-2.0',
+    author: 'Eran Raichstein',
+  };
+}
+
+function openAboutWindow(): void {
+  if (aboutWindow && !aboutWindow.isDestroyed()) {
+    aboutWindow.show();
+    aboutWindow.focus();
+    return;
+  }
+  aboutWindow = new BrowserWindow({
+    width: 380,
+    height: 440,
+    resizable: false,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    title: 'About Big Eyes',
+    show: false,
+    autoHideMenuBar: true,
+    backgroundColor: '#15121c',
+    webPreferences: webPreferences(null),
+  });
+  void aboutWindow.loadURL('app://bundle/about.html');
+  aboutWindow.once('ready-to-show', () => aboutWindow?.show());
+  aboutWindow.on('closed', () => {
+    aboutWindow = null;
+    if (process.platform === 'darwin' && !settingsWindow) app.dock?.hide();
+  });
+  if (process.platform === 'darwin') void app.dock?.show();
+}
+
+/** Only our own GitHub pages may be opened from the app. */
+function openLink(url: unknown): void {
+  if (typeof url !== 'string') return;
+  if (url === REPO_URL || url.startsWith(`${REPO_URL}/`) || url === RELEASES_URL || url === ISSUES_URL) void shell.openExternal(url);
 }
 
 // ---- Settings window ------------------------------------------------------------------------------
@@ -399,7 +587,7 @@ function openSettingsWindow(): void {
   settingsWindow.once('ready-to-show', () => settingsWindow?.show());
   settingsWindow.on('closed', () => {
     settingsWindow = null;
-    if (process.platform === 'darwin') app.dock?.hide();
+    if (process.platform === 'darwin' && !aboutWindow) app.dock?.hide();
   });
   if (process.platform === 'darwin') void app.dock?.show();
 }
@@ -428,6 +616,11 @@ function onSettingsChanged(previous: Settings, next: Settings): void {
   for (const { window } of overlays) if (!window.isDestroyed()) window.webContents.send(IPC.settings, s);
   settingsWindow?.webContents.send(IPC.settings, next);
   if (previous.openAtLogin !== next.openAtLogin) void applyLoginItem(next.openAtLogin);
+  applyScreenSaverMode(next);
+  if (!next.waitWhileWatched && presence.phase !== 'idle') {
+    presence.reset();
+    setPresenceCamera(false);
+  }
   if (next.paused && !previous.paused) hide();
   updateTray();
 }
@@ -455,6 +648,21 @@ function registerIpc(): void {
     // Window coordinates (CSS pixels) to screen coordinates.
     const bounds = overlay.window.getBounds();
     overlay.eyeArea = { x: bounds.x + (r.x as number), y: bounds.y + (r.y as number), width: r.width as number, height: r.height as number };
+  });
+  ipcMain.handle(IPC.getAbout, () => aboutInfo());
+  ipcMain.on(IPC.checkUpdates, () => void updater?.check(true));
+  ipcMain.on(IPC.openLink, (_e, url: unknown) => openLink(url));
+  ipcMain.on(IPC.presenceFaces, (event, message: { faces?: unknown; error?: unknown }) => {
+    const sender = overlays.find((o) => o.window.webContents === event.sender);
+    if (!sender?.role.isTracker || presence.phase !== 'checking') return;
+    if (typeof message?.error === 'string') {
+      // A camera problem must never keep the eyes away.
+      debugLog('presence: camera error, ignoring the check:', message.error);
+      presence.fail();
+      setPresenceCamera(false);
+      return;
+    }
+    if (Array.isArray(message?.faces)) presence.report(message.faces as FaceObservation[], nowSeconds());
   });
   ipcMain.on(IPC.requestClose, (event) => {
     if (!overlays.some((o) => o.window.webContents === event.sender)) return;
@@ -509,6 +717,13 @@ async function runSnapshot(dir: string): Promise<void> {
   await fs.writeFile(path.join(dir, 'themes.png'), (await strip.webContents.capturePage()).toPNG());
   console.log(`wrote ${path.join(dir, 'themes.png')}`);
   strip.destroy();
+  // The About window, rendered offscreen, for checking.
+  const about = new BrowserWindow({ width: 380, height: 440, show: false, webPreferences: { ...webPreferences(null), offscreen: true } });
+  await about.loadURL('app://bundle/about.html');
+  await new Promise((r) => setTimeout(r, 1200));
+  await fs.writeFile(path.join(dir, 'about.png'), (await about.webContents.capturePage()).toPNG());
+  console.log(`wrote ${path.join(dir, 'about.png')}`);
+  about.destroy();
   // The settings window, rendered offscreen, for the docs.
   const settings = new BrowserWindow({ width: 560, height: 900, show: false, webPreferences: { ...webPreferences(null), offscreen: true } });
   forwardConsole(settings, 'settings');
@@ -549,8 +764,26 @@ void app.whenReady().then(async () => {
   tray.on('click', () => {
     if (process.platform !== 'darwin') tray?.popUpContextMenu();
   });
+  updater = new Updater({
+    autoCheckEnabled: () => store.get().checkForUpdates,
+    lastAnnounced: () => store.get().lastAnnouncedVersion,
+    setLastAnnounced: (version) => store.update({ lastAnnouncedVersion: version }),
+    onState: () => {
+      updateTray();
+      if (aboutWindow && !aboutWindow.isDestroyed()) aboutWindow.webContents.send(IPC.aboutUpdate, aboutInfo());
+    },
+    log: (...items) => debugLog(...items),
+  });
+  updater.start();
+  app.setAboutPanelOptions({
+    applicationName: 'Big Eyes',
+    applicationVersion: app.getVersion(),
+    copyright: '© 2026 Eran Raichstein and contributors. Apache-2.0 License.',
+    website: REPO_URL,
+  });
   rebuildOverlays();
   updateTray();
+  applyScreenSaverMode(store.get());
 
   screen.on('display-added', rebuildOverlays);
   screen.on('display-removed', rebuildOverlays);
