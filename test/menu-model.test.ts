@@ -73,7 +73,7 @@ describe('tray menu model', () => {
     expect(wait.action).toEqual({ kind: 'patch', patch: { waitWhileWatched: false } });
     expect(checked(showAfter)).toEqual(['30 seconds', "Wait While I'm Looking at the Screen"]);
     const saver = find(menu, 'Screen Saver');
-    expect(checked(saver)).toEqual(['Pause the eyes during the screen saver']);
+    expect(checked(saver)).toEqual(['Pause the eyes during the screen saver', 'Blur the Screen Behind the Eyes']);
     expect(find(saver.submenu!, 'Eyes replace the screen saver').action).toEqual({ kind: 'patch', patch: { screenSaver: 'replace' } });
   });
 
@@ -145,5 +145,26 @@ describe('screens menu', () => {
 
   it('no per-screen items with one screen', () => {
     expect(screensMenu(defaultSettings(), displays.slice(0, 1)).submenu).toHaveLength(3);
+  });
+});
+
+describe('screen saver menu', () => {
+  it('replace mode: blur is on by default and can be turned off', async () => {
+    const { screenSaverMenu } = await import('../src/main/menu-model');
+    const replace = mergeSettings(defaultSettings(), { screenSaver: 'replace' });
+    expect(replace.blur).toBe('screensaver');
+    expect(replace.blurStrength).toBe(1);
+    const menu = screenSaverMenu(replace);
+    const blur = find(menu.submenu!, 'Blur the Screen Behind the Eyes');
+    expect(blur.checked).toBe(true);
+    expect(blur.enabled).toBe(true);
+    expect(blur.action).toEqual({ kind: 'patch', patch: { blur: 'off' } });
+    const off = screenSaverMenu(mergeSettings(replace, { blur: 'off' }));
+    expect(find(off.submenu!, 'Blur the Screen Behind the Eyes').action).toEqual({ kind: 'patch', patch: { blur: 'screensaver' } });
+  });
+
+  it('pause mode: the blur choice is shown but disabled', async () => {
+    const { screenSaverMenu } = await import('../src/main/menu-model');
+    expect(find(screenSaverMenu(defaultSettings()).submenu!, 'Blur the Screen Behind the Eyes').enabled).toBe(false);
   });
 });

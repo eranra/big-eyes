@@ -7,7 +7,9 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
-- **Blur behind the eyes**: off, when replacing the screen saver (default), or always, with a strength setting.
+- **Blur behind the eyes**: when the eyes replace the screen saver, the screen behind them is blurred at full
+  strength by default; turn it off in **Screen Saver → Blur the Screen Behind the Eyes**. It can also be on always,
+  and the strength can be lowered.
   macOS uses the system blur, Windows 11 uses acrylic, Linux uses a strong tint.
 - A log file of app events (shows, hides and why, camera checks, locks, sleeps), for finding problems later:
   `~/Library/Logs/Big Eyes/main.log` on macOS. No images or face data are written.
