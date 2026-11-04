@@ -99,7 +99,8 @@ springy movement, expressive eyebrows, and wet-looking highlights.
   A short camera check before they appear uses the same eye-contact detection as the rest of the app, so looking at
   your phone doesn't count. (You can turn this off in **Show After**.)
 - They don't take keyboard focus and don't appear while your screen is locked.
-- By default they stay away while the **screen saver** runs. Or choose *Eyes replace the screen saver*, and the eyes appear instead of it.
+- By default they stay away while the **screen saver** runs. Or choose *Eyes replace the screen saver*, and the eyes appear instead of it,
+  with the screen behind them **strongly blurred** (you can turn the blur off).
 - On macOS they also wait while a video or presentation is playing.
 
 ![Look into the eyes to close them](docs/images/goodbye.png)
@@ -123,7 +124,7 @@ Click the 👀 icon for quick choices, or open **Settings…** for everything, w
 | **Show after** | 15 seconds … 10 minutes, or any time | 30 seconds |
 | **Wait while I'm looking** | Don't appear while someone is looking at the screen, even without keyboard or mouse use | On |
 | **Screen saver** | Pause the eyes during the screen saver, or let the eyes replace the screen saver | Pause |
-| **Blur behind the eyes** | Off, when replacing the screen saver, or always; strength | When replacing the screen saver |
+| **Blur behind the eyes** | When the eyes replace the screen saver: blur on or off. Or blur always. Strength slider | On when replacing the screen saver, full strength |
 | **Updates** | Check for new versions automatically | On |
 | **Screens** | Built-in screen, main screen, all screens, or the ones you pick | Built-in screen |
 | **Cameras** | Built-in camera, system default, all cameras, or the ones you pick. With several cameras, the first is the main one: the eyes follow what it sees, and the others notice you when it can't | Built-in camera |

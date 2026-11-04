@@ -430,7 +430,7 @@ export function defaultSettings(): Settings {
     waitWhileWatched: true,
     screenSaver: 'pause',
     blur: 'screensaver',
-    blurStrength: 0.85,
+    blurStrength: 1,
     mouseRule: 'onto-eyes',
     lookToClose: false,
     lookToCloseSeconds: 2,

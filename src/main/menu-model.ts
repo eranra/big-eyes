@@ -151,6 +151,30 @@ export function showAfterMenu(settings: Settings): MenuNode {
   };
 }
 
+/**
+ * "Screen Saver": pause or replace, and, for replace, whether the screen behind the eyes is blurred
+ * (on by default, so a replaced screen saver still hides what is on the screen).
+ */
+export function screenSaverMenu(settings: Settings): MenuNode {
+  const modes = presetMenu('Screen Saver', SCREEN_SAVER_MODES, settings.screenSaver, (a, b) => a === b, (v) => ({ screenSaver: v }));
+  const blurred = settings.blur !== 'off';
+  return {
+    ...modes,
+    submenu: [
+      ...modes.submenu!,
+      separator,
+      {
+        label: 'Blur the Screen Behind the Eyes',
+        type: 'checkbox',
+        checked: blurred,
+        enabled: settings.screenSaver === 'replace',
+        // Turning it on keeps "always" if that was chosen; otherwise it blurs when replacing the screen saver.
+        action: patch({ blur: blurred ? 'off' : 'screensaver' }),
+      },
+    ],
+  };
+}
+
 export function blinkMenu(settings: Settings): MenuNode {
   const rate = presetMenu('', BLINK_RATE_PRESETS, settings.blink.rate, near, (v) => ({ blink: { rate: v } }));
   const speed = presetMenu('', BLINK_SPEED_PRESETS, settings.blink.speed, near, (v) => ({ blink: { speed: v } }));
@@ -225,7 +249,7 @@ export function buildMenuModel(
     separator,
     presetMenu('Eye Size', EYE_SIZE_PRESETS, settings.eyeSize, near, (v) => ({ eyeSize: v })),
     showAfterMenu(settings),
-    presetMenu('Screen Saver', SCREEN_SAVER_MODES, settings.screenSaver, (a, b) => a === b, (v) => ({ screenSaver: v })),
+    screenSaverMenu(settings),
     presetMenu('Blur Behind the Eyes', BLUR_MODES, settings.blur, (a, b) => a === b, (v) => ({ blur: v })),
     themeMenu(settings),
     presetMenu('Position', POSITIONS, settings.position, (a, b) => a === b, (v) => ({ position: v })),
