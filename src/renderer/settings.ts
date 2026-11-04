@@ -3,7 +3,7 @@ import { chooseCameras, findCamera, isBuiltInCamera } from '../core/camera';
 import type { CameraInfo } from '../core/ipc';
 import type { BigEyesApi, DisplaySummary } from '../core/ipc';
 import type { Mood } from '../core/mood';
-import { defaultSettings, EYE_SHAPES, IRIS_PRESETS, MOUSE_RULES, POSITIONS, PUPIL_SHAPES, SCREEN_SAVER_MODES, BLUR_MODES, IRIS_STYLES, matchingTheme, THEMES, type LookSettings, type Settings } from '../core/settings';
+import { defaultSettings, EYE_SHAPES, IRIS_PRESETS, MOUSE_RULES, POSITIONS, PUPIL_SHAPES, SCREEN_SAVER_MODES, BLUR_MODES, SCREEN_SAVER_TIME_PRESETS, IRIS_STYLES, matchingTheme, THEMES, type LookSettings, type Settings } from '../core/settings';
 import { drawEyes } from './draw';
 import { FaceTracker } from './tracker';
 
@@ -296,6 +296,9 @@ for (const rule of MOUSE_RULES) {
 const screenSaverSelect = $<HTMLSelectElement>('screenSaver');
 for (const m of SCREEN_SAVER_MODES) screenSaverSelect.append(new Option(m.label, m.value));
 screenSaverSelect.addEventListener('change', () => save({ screenSaver: screenSaverSelect.value }, 0));
+const saverMinutes = $<HTMLSelectElement>('screenSaverMinutes');
+for (const p of SCREEN_SAVER_TIME_PRESETS) saverMinutes.append(new Option(p.label, String(p.value)));
+saverMinutes.addEventListener('change', () => save({ screenSaverMinutes: Number(saverMinutes.value) }, 0));
 const blurSelect = $<HTMLSelectElement>('blur');
 for (const m of BLUR_MODES) blurSelect.append(new Option(m.label, m.value));
 blurSelect.addEventListener('change', () => save({ blur: blurSelect.value }, 0));
@@ -326,6 +329,11 @@ function renderBehavior(next: Settings): void {
   smileBack.checked = next.mood.smileBack;
   screenSaverSelect.value = next.screenSaver;
   blurSelect.value = next.blur;
+  if (![...saverMinutes.options].some((o) => o.value === String(next.screenSaverMinutes))) {
+    saverMinutes.append(new Option(`${next.screenSaverMinutes} minutes`, String(next.screenSaverMinutes)));
+  }
+  saverMinutes.value = String(next.screenSaverMinutes);
+  saverMinutes.disabled = next.screenSaver !== 'replace';
   if (document.activeElement !== blurStrength) blurStrength.value = String(next.blurStrength);
   (blurStrength.nextElementSibling as HTMLOutputElement).value = `${Math.round(next.blurStrength * 100)}%`;
   blurStrength.disabled = next.blur === 'off';

@@ -24,10 +24,10 @@ import { PresenceCheck } from '../core/presence';
 import { ActivityClock } from '../core/activity';
 import type { FaceObservation } from '../core/face';
 import { IPC, type CameraInfo, type DisplaySummary, type FacesMessage, type OverlayRole } from '../core/ipc';
-import { blurActive, selectDisplays, type GazeReference, type Settings } from '../core/settings';
+import { blurActive, screenSaverSeconds, selectDisplays, type GazeReference, type Settings } from '../core/settings';
 import { buildMenuModel, type MenuAction, type MenuNode } from './menu-model';
 import { SettingsStore } from './store';
-import { displaySleepPrevented, screenSaverRunning, setLinuxAutostart } from './system';
+import { displaySleepPrevented, screenSaverRunning, setLinuxAutostart, systemScreenSaverSeconds } from './system';
 import { Updater, updateMenuLabel, type UpdateState } from './updater';
 import { log as writeLog, logFile } from './logger';
 import { ISSUES_URL, RELEASES_URL, REPO_URL } from '../core/update';
@@ -109,6 +109,10 @@ let screenSaverActive = false;
 let lastScreenSaverCheck = 0;
 let lastActivityLog = 0;
 let lastBlockLog = 0;
+/** Whether the overlays are blurred right now. */
+let blurOn = false;
+/** The system's screen saver (or display sleep) time in seconds, read at start and every 10 minutes. */
+let systemSaverSeconds: number | null = null;
 let presenceStartedAt = 0;
 let presenceFrames = 0;
 let lastCursor = { x: 0, y: 0 };
@@ -268,7 +272,7 @@ function createOverlay(display: Display, isTracker: boolean): Overlay {
   window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
   // Clicks go through to the apps below. Any click or key press resets the idle time, which hides the eyes.
   window.setIgnoreMouseEvents(true);
-  applyBlur(window, blurActive(store.get()));
+  applyBlur(window, blurOn);
   window.setBounds(display.bounds);
   if (FORCE_DEBUG) forwardConsole(window, `overlay ${display.id}`);
   void window.loadURL('app://bundle/overlay.html');
@@ -314,6 +318,10 @@ function showOverlays(): void {
 
 function hideOverlays(): void {
   for (const o of overlays) o.eyeArea = null;
+  // Remove the blur after the fade-out, so the screen does not jump.
+  setTimeout(() => {
+    if (!idle.isShowing) updateBlur(0);
+  }, 500);
   for (const { window } of overlays) if (!window.isDestroyed()) window.webContents.send(IPC.visibility, false);
   // Let the fade-out animation finish, then hide the windows.
   if (hideTimer) clearTimeout(hideTimer);
@@ -352,6 +360,24 @@ function applyScreenSaverMode(s: Settings): void {
     powerSaveBlocker.stop(screenSaverBlocker);
     screenSaverBlocker = null;
     eventLog('screen saver: allowed');
+  }
+}
+
+let lastIdleSeconds = 0;
+
+/** Turns the blur behind the eyes on or off, from the settings and how long the computer has been idle. */
+function updateBlur(idleSeconds: number): void {
+  const want = idle.isShowing && blurActive(store.get(), idleSeconds, systemSaverSeconds);
+  if (want === blurOn) return;
+  blurOn = want;
+  if (want) {
+    const at = screenSaverSeconds(store.get(), systemSaverSeconds);
+    eventLog(`blur on (idle ${Math.round(idleSeconds)}s, screen saver time ${Math.round(at)}s)`);
+  }
+  for (const o of overlays) {
+    if (o.window.isDestroyed()) continue;
+    applyBlur(o.window, want);
+    o.window.webContents.send(IPC.blur, want);
   }
 }
 
@@ -449,6 +475,8 @@ async function checkIdle(): Promise<void> {
       }
     }
 
+    lastIdleSeconds = idleSeconds;
+    updateBlur(idleSeconds);
     if (STAY && idle.isShowing) return;
     const event = idle.update({ idleSeconds, now, blocked, pointerMoved, pointerInEyes, mouseRule: s.mouseRule });
     if (event) eventLog(`idle event: ${event}${event === 'hide' ? ` (${idle.lastHideReason})` : ''} idle=${idleSeconds.toFixed(1)}s system=${systemIdle}s`);
@@ -457,6 +485,7 @@ async function checkIdle(): Promise<void> {
       presence.reset();
       hideOverlays();
     }
+    updateBlur(idleSeconds);
   } finally {
     checking = false;
   }
@@ -670,9 +699,7 @@ function onSettingsChanged(previous: Settings, next: Settings): void {
   settingsWindow?.webContents.send(IPC.settings, next);
   if (previous.openAtLogin !== next.openAtLogin) void applyLoginItem(next.openAtLogin);
   applyScreenSaverMode(next);
-  if (blurActive(previous) !== blurActive(next)) {
-    for (const o of overlays) if (!o.window.isDestroyed()) applyBlur(o.window, blurActive(next));
-  }
+  if (idle.isShowing) updateBlur(lastIdleSeconds);
   if (!next.waitWhileWatched && presence.phase !== 'idle') {
     presence.reset();
     setPresenceCamera(false);
@@ -844,6 +871,13 @@ void app.whenReady().then(async () => {
     copyright: '© 2026 Eran Raichstein and contributors. Apache-2.0 License.',
     website: REPO_URL,
   });
+  const readSaverTime = async (): Promise<void> => {
+    const seconds = await systemScreenSaverSeconds();
+    if (seconds !== systemSaverSeconds) eventLog(`system screen saver / display sleep time: ${seconds ? `${Math.round(seconds / 60)} min` : 'none'}`);
+    systemSaverSeconds = seconds;
+  };
+  void readSaverTime();
+  setInterval(() => void readSaverTime(), 10 * 60 * 1000);
   rebuildOverlays();
   updateTray();
   applyScreenSaverMode(store.get());

@@ -12,6 +12,7 @@ import {
   POSITIONS,
   BLUR_MODES,
   SCREEN_SAVER_MODES,
+  SCREEN_SAVER_TIME_PRESETS,
   THEMES,
   type Settings,
 } from '../core/settings';
@@ -158,16 +159,21 @@ export function showAfterMenu(settings: Settings): MenuNode {
 export function screenSaverMenu(settings: Settings): MenuNode {
   const modes = presetMenu('Screen Saver', SCREEN_SAVER_MODES, settings.screenSaver, (a, b) => a === b, (v) => ({ screenSaver: v }));
   const blurred = settings.blur !== 'off';
+  const replacing = settings.screenSaver === 'replace';
+  const time = presetMenu('Screen Saver Starts After', SCREEN_SAVER_TIME_PRESETS, settings.screenSaverMinutes, (a, b) => a === b, (v) => ({
+    screenSaverMinutes: v,
+  }));
   return {
     ...modes,
     submenu: [
       ...modes.submenu!,
       separator,
+      { ...time, enabled: replacing },
       {
         label: 'Blur the Screen Behind the Eyes',
         type: 'checkbox',
         checked: blurred,
-        enabled: settings.screenSaver === 'replace',
+        enabled: replacing,
         // Turning it on keeps "always" if that was chosen; otherwise it blurs when replacing the screen saver.
         action: patch({ blur: blurred ? 'off' : 'screensaver' }),
       },

@@ -79,6 +79,10 @@ counts. So looking at a phone, a book or another screen does not hold the eyes b
   showing is blocked, and the eyes close if they were open.
 - `replace`: `powerSaveBlocker.start('prevent-display-sleep')` keeps the screen saver and display sleep away while
   Big Eyes runs. The "don't show during video" check ignores this blocker, because it is our own.
+- Blur in `replace` mode starts when the idle time reaches the screen saver time (`screenSaverSeconds()`): the
+  user's own time, else the system screen saver time (`defaults -currentHost read com.apple.screensaver idleTime`),
+  else the display sleep time (`pmset -g displaysleep`), else 10 minutes. The main process decides it on every idle
+  tick and switches the window blur (macOS vibrancy, Windows acrylic) and the page tint.
 
 ## Updates
 

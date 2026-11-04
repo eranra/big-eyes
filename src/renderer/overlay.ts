@@ -1,7 +1,7 @@
 import { EyeAnimator } from '../core/animator';
 import { averageReference } from '../core/attention';
 import type { BigEyesApi } from '../core/ipc';
-import { blurActive, defaultSettings, type GazeReference, type Settings } from '../core/settings';
+import { defaultSettings, type GazeReference, type Settings } from '../core/settings';
 import { drawEyes, eyeBounds, eyeLayout } from './draw';
 import { FaceTracker } from './tracker';
 
@@ -97,9 +97,7 @@ function applySettings(next: Settings): void {
   settings = next;
   animator.apply(next);
   document.documentElement.style.setProperty('--dim', String(next.backgroundDim));
-  const blur = blurActive(next);
-  document.body.classList.toggle('blur', blur);
-  document.documentElement.style.setProperty('--blur', blur ? String(next.blurStrength) : '0');
+  document.documentElement.style.setProperty('--blur', String(next.blurStrength));
   if (tracker && visible && cameraChanged) void startTracker();
   void reportCameras();
 }
@@ -231,6 +229,8 @@ function frame(): void {
   });
 }
 
+// The main process turns the blur on when the screen saver time is reached (or at once in "always" mode).
+api.onBlur((on) => document.body.classList.toggle('blur', on));
 api.onSettings(applySettings);
 api.onVisibility(setVisible);
 api.onCalibrate(startCalibration);
