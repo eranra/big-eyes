@@ -5,6 +5,8 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-11-04
+
 ### Fixed
 
 - *Wait while I'm looking* now uses the same eye-contact detection as the eyes and look-to-close. Before, any face
