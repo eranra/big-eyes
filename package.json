@@ -1,0 +1,51 @@
+{
+  "name": "big-eyes",
+  "productName": "Big Eyes",
+  "version": "0.1.0",
+  "description": "Big, friendly eyes that appear over your screen when you leave your computer idle, follow your head, smile when you look at them, and get bored when you look away.",
+  "license": "Apache-2.0",
+  "author": "Eran Raichstein",
+  "homepage": "https://github.com/eranra/big-eyes",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/eranra/big-eyes.git"
+  },
+  "keywords": [
+    "electron",
+    "eyes",
+    "overlay",
+    "face-tracking",
+    "mediapipe",
+    "screensaver"
+  ],
+  "main": "build/main/main.js",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "fetch-model": "node scripts/fetch-model.mjs",
+    "build": "node scripts/build.mjs",
+    "start": "npm run build && electron .",
+    "dev": "npm run build && electron . --show-eyes --debug-eyes",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "npm run typecheck && npm run test",
+    "dist": "npm run build && electron-builder --publish never",
+    "dist:mac": "npm run build && electron-builder --mac --publish never",
+    "dist:win": "npm run build && electron-builder --win --publish never",
+    "dist:linux": "npm run build && electron-builder --linux --publish never",
+    "icons": "node scripts/make-icons.mjs",
+    "snapshots": "npm run build && electron . --snapshot docs/images"
+  },
+  "devDependencies": {
+    "@mediapipe/tasks-vision": "1.1.1",
+    "@types/node": "26.6.5",
+    "electron": "44.9.0",
+    "electron-builder": "26.17.0",
+    "esbuild": "0.28.2",
+    "typescript": "7.0.2",
+    "vitest": "4.1.12"
+  }
+}

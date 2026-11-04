@@ -1,0 +1,247 @@
+:root {
+  color-scheme: dark;
+  --bg: #15121c;
+  --panel: #1e1a28;
+  --line: #2e2840;
+  --text: #ece8f4;
+  --muted: #9a93ab;
+  --accent: #8c7cf0;
+  font-family: ui-rounded, 'SF Pro Rounded', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-size: 14px;
+}
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+}
+body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: radial-gradient(ellipse at center, #241d36 0%, var(--bg) 75%);
+  border-bottom: 1px solid var(--line);
+  padding: 8px 16px 12px;
+}
+#preview {
+  display: block;
+  width: 100%;
+  height: 190px;
+}
+.mood-buttons {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+main {
+  flex: 1;
+  padding: 8px 16px 16px;
+}
+section {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-top: 12px;
+}
+h2 {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+}
+.row > span:first-child {
+  flex: 0 0 150px;
+  color: var(--muted);
+}
+.row.check > span {
+  flex: 1;
+  color: var(--text);
+}
+.row input[type='range'] {
+  flex: 1;
+  accent-color: var(--accent);
+}
+.row input[type='text'],
+.row select {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 8px;
+  font: inherit;
+}
+.row input[type='checkbox'] {
+  accent-color: var(--accent);
+  width: 16px;
+  height: 16px;
+}
+.row input[type='color'] {
+  width: 34px;
+  height: 26px;
+  border: none;
+  background: none;
+  padding: 0;
+}
+output {
+  width: 64px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.swatches {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+}
+.swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  padding: 0;
+  cursor: pointer;
+}
+.swatch.on {
+  border-color: var(--text);
+}
+button {
+  font: inherit;
+  color: var(--text);
+  background: #2a2438;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+button:hover {
+  background: #342c46;
+}
+button.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #120f19;
+}
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #120f19;
+  font-weight: 600;
+}
+button.quiet {
+  background: transparent;
+}
+button.small {
+  padding: 4px 9px;
+}
+.buttons {
+  gap: 8px;
+}
+#cameraTest {
+  width: 100%;
+  max-height: 200px;
+  border-radius: 8px;
+  margin: 6px 0;
+  background: #000;
+  object-fit: contain;
+  transform: scaleX(-1);
+}
+footer {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: var(--panel);
+  border-top: 1px solid var(--line);
+}
+#status {
+  flex: 1;
+  color: var(--muted);
+  font-size: 12px;
+}
+.screen {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 32px;
+}
+body:not(.mac) .mac-only {
+  display: none;
+}
+
+.themes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 1;
+}
+.color-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 12px;
+  flex: 1;
+  color: var(--text);
+}
+.color-grid label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.row.colors {
+  align-items: flex-start;
+  padding: 6px 0;
+}
+.row select {
+  flex: 1;
+}
+
+.positions {
+  display: grid;
+  grid-template-columns: repeat(3, 34px);
+  grid-template-rows: repeat(3, 22px);
+  gap: 4px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+}
+.positions button {
+  padding: 0;
+  border-radius: 5px;
+}
+.position-label {
+  color: var(--muted);
+  margin-left: 10px;
+}
+.hint {
+  margin: 0 0 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+#mouseRules label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 30px;
+}

@@ -1,0 +1,9 @@
+Big Eyes
+Copyright 2026 Eran Raichstein and the Big Eyes contributors
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This product includes software developed by third parties:
+- MediaPipe Tasks Vision and the Face Landmarker model, Copyright Google LLC, Apache License 2.0.
+- Electron, Copyright the Electron contributors, MIT License (includes Chromium and Node.js).
+See THIRD_PARTY_NOTICES.md for details.

@@ -1,0 +1,65 @@
+# Packaging for macOS, Windows and Linux. Run `npm run dist` (current platform) or dist:mac / dist:win / dist:linux.
+appId: io.github.eranra.big-eyes
+productName: Big Eyes
+copyright: Copyright © 2026 Eran Raichstein and contributors
+directories:
+  output: dist
+  buildResources: assets
+files:
+  - build/**/*
+  - '!build/**/*.map'
+  - assets/icons/**/*
+  - package.json
+asar: true
+asarUnpack:
+  # The WebAssembly files and the model are read over the app:// protocol; keep them as plain files.
+  - build/renderer/wasm/**
+  - build/renderer/models/**
+icon: assets/icons/icon.png
+
+mac:
+  category: public.app-category.entertainment
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+  # "-" = ad-hoc signature. The app runs, and macOS remembers camera access, without an Apple developer account.
+  # For notarized releases set CSC_LINK / CSC_KEY_PASSWORD (and APPLE_ID ...) and change this to null.
+  identity: '-'
+  hardenedRuntime: true
+  entitlements: assets/entitlements.mac.plist
+  entitlementsInherit: assets/entitlements.mac.plist
+  extendInfo:
+    LSUIElement: true
+    NSCameraUsageDescription: >-
+      Big Eyes uses the camera to see where you are and whether you look at the eyes.
+      Video is processed on this computer only and is never saved or sent anywhere.
+
+dmg:
+  title: Big Eyes
+  # The usual "drag the app onto Applications" window.
+  contents:
+    - x: 150
+      y: 190
+    - x: 410
+      y: 190
+      type: link
+      path: /Applications
+  window:
+    width: 560
+    height: 380
+artifactName: Big-Eyes-${version}-${arch}.${ext}
+
+win:
+  target:
+    - target: nsis
+      arch: [x64, arm64]
+nsis:
+  oneClick: true
+  perMachine: false
+  artifactName: Big-Eyes-Setup-${version}.${ext}
+
+linux:
+  category: Utility
+  executableName: big-eyes
+  target: [AppImage, deb]
+  synopsis: Friendly eyes that look back at you when you are idle

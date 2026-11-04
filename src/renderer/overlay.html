@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob: mediastream:; connect-src 'self'; worker-src 'self' blob:"
+    />
+    <title>Big Eyes</title>
+    <style>
+      :root {
+        --dim: 0.35;
+      }
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: transparent;
+        cursor: none;
+        user-select: none;
+      }
+      #backdrop {
+        position: fixed;
+        inset: 0;
+        /* A soft vignette: darker at the edges, so the eyes stand out but your apps stay visible. */
+        background: radial-gradient(
+          ellipse at center,
+          rgba(10, 6, 18, calc(var(--dim) * 0.75)) 0%,
+          rgba(10, 6, 18, var(--dim)) 70%,
+          rgba(10, 6, 18, min(1, calc(var(--dim) * 1.15))) 100%
+        );
+      }
+      #backdrop,
+      #eyes {
+        opacity: 0;
+        transition: opacity 0.4s ease-in;
+      }
+      #eyes {
+        position: fixed;
+        inset: 0;
+        transform: scale(0.96);
+        transition:
+          opacity 0.4s ease-in,
+          transform 0.4s ease-in;
+      }
+      body.visible #backdrop,
+      body.visible #eyes {
+        opacity: 1;
+        transition-duration: 0.9s;
+        transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+      }
+      body.visible #eyes {
+        transform: scale(1);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="backdrop"></div>
+    <canvas id="eyes"></canvas>
+    <script src="overlay.js"></script>
+  </body>
+</html>
