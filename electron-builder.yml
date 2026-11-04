@@ -61,5 +61,6 @@ nsis:
 linux:
   category: Utility
   executableName: big-eyes
+  maintainer: Eran Raichstein <eranra@users.noreply.github.com>
   target: [AppImage, deb]
   synopsis: Friendly eyes that look back at you when you are idle
