@@ -136,19 +136,36 @@ Kernel Assertions: 0x104=USB`;
 });
 
 describe('blur behind the eyes', () => {
-  it('default: blur only when the eyes replace the screen saver', async () => {
+  it('replace mode: no blur for the normal eyes, blur once the screen saver time is reached', async () => {
+    const { blurActive } = await import('../src/core');
+    const replace = { ...defaultSettings(), screenSaver: 'replace' as const };
+    // The system screen saver (or display sleep) time is 60 minutes.
+    expect(blurActive(replace, 30, 3600)).toBe(false);
+    expect(blurActive(replace, 3599, 3600)).toBe(false);
+    expect(blurActive(replace, 3600, 3600)).toBe(true);
+  });
+
+  it('pause mode never blurs; "always" blurs at once; "off" never blurs', async () => {
     const { blurActive } = await import('../src/core');
     const d = defaultSettings();
-    expect(d.blur).toBe('screensaver');
-    expect(blurActive(d)).toBe(false);
-    expect(blurActive({ ...d, screenSaver: 'replace' })).toBe(true);
-    expect(blurActive({ ...d, blur: 'always' })).toBe(true);
-    expect(blurActive({ ...d, blur: 'off', screenSaver: 'replace' })).toBe(false);
+    expect(blurActive(d, 99999, 600)).toBe(false);
+    expect(blurActive({ ...d, blur: 'always' }, 30, 3600)).toBe(true);
+    expect(blurActive({ ...d, blur: 'off', screenSaver: 'replace' }, 99999, 600)).toBe(false);
+  });
+
+  it('screen saver time: own setting, else the system, else 10 minutes', async () => {
+    const { screenSaverSeconds } = await import('../src/core');
+    expect(screenSaverSeconds({ screenSaverMinutes: 15 }, 3600)).toBe(900);
+    expect(screenSaverSeconds({ screenSaverMinutes: 0 }, 3600)).toBe(3600);
+    expect(screenSaverSeconds({ screenSaverMinutes: 0 }, null)).toBe(600);
+    expect(defaultSettings().screenSaverMinutes).toBe(0);
   });
 
   it('validates blur values', () => {
     expect(normalizeSettings({ blur: 'heavy' }).blur).toBe('screensaver');
     expect(normalizeSettings({ blurStrength: 5 }).blurStrength).toBe(1);
     expect(normalizeSettings({ blurStrength: 0 }).blurStrength).toBe(0.3);
+    expect(normalizeSettings({ screenSaverMinutes: 7.6 }).screenSaverMinutes).toBe(8);
+    expect(normalizeSettings({ screenSaverMinutes: -5 }).screenSaverMinutes).toBe(0);
   });
 });

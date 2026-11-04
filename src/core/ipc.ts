@@ -37,6 +37,8 @@ export const IPC = {
   presenceFaces: 'big-eyes:presence-faces',
   /** overlay -> main: the eyes finished look-to-close; hide them. */
   requestClose: 'big-eyes:request-close',
+  /** main -> overlay: the blur behind the eyes turns on (true) or off (false). */
+  blur: 'big-eyes:blur',
   /** renderer -> main: one line for the log file. */
   log: 'big-eyes:log',
   /** about window -> main (invoke): app version, platform, update state. */
@@ -105,6 +107,7 @@ export interface BigEyesApi {
   onSettings(listener: (settings: Settings) => void): void;
   onVisibility(listener: (visible: boolean) => void): void;
   onCalibrate(listener: () => void): void;
+  onBlur(listener: (on: boolean) => void): void;
   onFaces(listener: (message: FacesMessage) => void): void;
   onPresenceCheck(listener: (active: boolean) => void): void;
   sendPresenceFaces(message: { faces: FacesMessage['faces']; error?: string }): void;

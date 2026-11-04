@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { linuxAutostartEntry, parsePmsetAssertions } from '../src/main/system';
+import { linuxAutostartEntry, parseDisplaySleepMinutes, parsePmsetAssertions } from '../src/main/system';
 
 describe('pmset parsing', () => {
   const sample = (display: number, noDisplay: number): string => `Assertion status system-wide:
@@ -31,5 +31,13 @@ describe('linux autostart entry', () => {
     expect(linuxAutostartEntry('/opt/Big Eyes/big-eyes')).toContain('Exec="/opt/Big Eyes/big-eyes"');
     expect(linuxAutostartEntry('/usr/bin/big-eyes')).toContain('Exec=/usr/bin/big-eyes\n');
     expect(linuxAutostartEntry('/x')).toMatch(/^\[Desktop Entry\]\nType=Application/);
+  });
+});
+
+describe('display sleep time', () => {
+  it('reads pmset -g, also while an app prevents display sleep', () => {
+    expect(parseDisplaySleepMinutes(' disksleep 10\n displaysleep         60 (display sleep prevented by Big Eyes)\n')).toBe(60);
+    expect(parseDisplaySleepMinutes(' displaysleep 0\n')).toBe(0);
+    expect(parseDisplaySleepMinutes('')).toBeNull();
   });
 });

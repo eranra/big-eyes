@@ -169,7 +169,15 @@
           <span>Blur behind the eyes</span>
           <select id="blur"></select>
         </div>
-        <p class="hint">When the eyes replace the screen saver, the screen behind them is blurred by default, so nothing on it can be read.</p>
+        <div class="row">
+          <span>Screen saver starts after</span>
+          <select id="screenSaverMinutes"></select>
+        </div>
+        <p class="hint">
+          In "replace" mode the eyes appear as usual. When the screen saver time is reached, the screen behind them is blurred
+          (by default), so nothing on it can be read. "Same as the system" uses your screen saver time, or else the time the
+          display would turn off.
+        </p>
         <label class="row">
           <span>Blur strength</span>
           <input id="blurStrength" type="range" min="0.3" max="1" step="0.05" />

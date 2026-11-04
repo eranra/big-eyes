@@ -95,3 +95,39 @@ export async function setLinuxAutostart(enabled: boolean, execPath: string): Pro
     await fs.rm(file, { force: true });
   }
 }
+
+/** Parses `pmset -g` output: the display sleep time in minutes (0 = never). Exported for tests. */
+export function parseDisplaySleepMinutes(output: string): number | null {
+  const m = /^\s*displaysleep\s+(\d+)/m.exec(output);
+  return m ? Number(m[1]) : null;
+}
+
+const run = (cmd: string, args: string[]): Promise<string | null> =>
+  new Promise((resolve) =>
+    execFile(cmd, args, { timeout: 3000, windowsHide: true }, (error, stdout) => resolve(error ? null : String(stdout))),
+  );
+
+/**
+ * The time (seconds) after which this computer would start its screen saver, or null if it has none.
+ * - macOS: the screen saver time if set; otherwise the display sleep time (the display turns off and,
+ *   usually, the screen locks).
+ * - Windows: the screen saver timeout, if a screen saver is on.
+ * - Linux: not read (null).
+ */
+export async function systemScreenSaverSeconds(): Promise<number | null> {
+  if (process.platform === 'darwin') {
+    const saver = Number((await run('/usr/bin/defaults', ['-currentHost', 'read', 'com.apple.screensaver', 'idleTime']))?.trim());
+    if (Number.isFinite(saver) && saver > 0) return saver;
+    const minutes = parseDisplaySleepMinutes((await run('/usr/bin/pmset', ['-g'])) ?? '');
+    return minutes && minutes > 0 ? minutes * 60 : null;
+  }
+  if (process.platform === 'win32') {
+    const key = 'HKCU\\Control Panel\\Desktop';
+    const active = await run('reg', ['query', key, '/v', 'ScreenSaveActive']);
+    if (!active || !/ScreenSaveActive\s+REG_SZ\s+1/.test(active)) return null;
+    const timeout = await run('reg', ['query', key, '/v', 'ScreenSaveTimeOut']);
+    const m = timeout && /ScreenSaveTimeOut\s+REG_SZ\s+(\d+)/.exec(timeout);
+    return m ? Number(m[1]) : null;
+  }
+  return null;
+}

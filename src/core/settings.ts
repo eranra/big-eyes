@@ -117,6 +117,11 @@ export interface Settings {
   screenSaver: ScreenSaverMode;
   /** Blur the screen behind the eyes. */
   blur: BlurMode;
+  /**
+   * Minutes of no input after which the screen saver would start ("replace" mode: when the blur starts).
+   * 0 = use the system: the macOS screen saver time if set, else the display sleep time.
+   */
+  screenSaverMinutes: number;
   /** Blur strength, 0.3 (light) .. 1 (strong: nothing readable behind). */
   blurStrength: number;
   /** What mouse movement does while the eyes are shown. */
@@ -372,9 +377,42 @@ export const BLUR_MODES: ReadonlyArray<{ label: string; value: BlurMode }> = [
   { label: 'Always', value: 'always' },
 ];
 
-/** Whether the screen behind the eyes is blurred now. */
-export function blurActive(s: Pick<Settings, 'blur' | 'screenSaver'>): boolean {
-  return s.blur === 'always' || (s.blur === 'screensaver' && s.screenSaver === 'replace');
+export const SCREEN_SAVER_TIME_PRESETS: ReadonlyArray<{ label: string; value: number }> = [
+  { label: 'Same as the System', value: 0 },
+  { label: '5 minutes', value: 5 },
+  { label: '10 minutes', value: 10 },
+  { label: '15 minutes', value: 15 },
+  { label: '30 minutes', value: 30 },
+  { label: '1 hour', value: 60 },
+];
+
+/** Used when the system has no screen saver time and no display sleep time. */
+export const FALLBACK_SCREEN_SAVER_MINUTES = 10;
+
+/**
+ * Seconds of no input after which the screen saver would start.
+ * @param systemSeconds the system's screen saver time, or else display sleep time, in seconds (0 or null = none).
+ */
+export function screenSaverSeconds(s: Pick<Settings, 'screenSaverMinutes'>, systemSeconds: number | null): number {
+  if (s.screenSaverMinutes > 0) return s.screenSaverMinutes * 60;
+  if (systemSeconds && systemSeconds > 0) return systemSeconds;
+  return FALLBACK_SCREEN_SAVER_MINUTES * 60;
+}
+
+/**
+ * Whether the screen behind the eyes is blurred now.
+ * - 'always': whenever the eyes are shown.
+ * - 'screensaver': only in "replace" mode, and only once the idle time reached the screen saver time;
+ *   the normal eyes before that are not blurred.
+ */
+export function blurActive(
+  s: Pick<Settings, 'blur' | 'screenSaver' | 'screenSaverMinutes'>,
+  idleSeconds: number,
+  systemScreenSaverSeconds: number | null,
+): boolean {
+  if (s.blur === 'always') return true;
+  if (s.blur !== 'screensaver' || s.screenSaver !== 'replace') return false;
+  return idleSeconds >= screenSaverSeconds(s, systemScreenSaverSeconds);
 }
 
 export const BLINK_RATE_PRESETS: ReadonlyArray<{ label: string; value: number }> = [
@@ -430,6 +468,7 @@ export function defaultSettings(): Settings {
     waitWhileWatched: true,
     screenSaver: 'pause',
     blur: 'screensaver',
+    screenSaverMinutes: 0,
     blurStrength: 1,
     mouseRule: 'onto-eyes',
     lookToClose: false,
@@ -590,6 +629,7 @@ export function normalizeSettings(input: unknown): Settings {
     waitWhileWatched: bool(s.waitWhileWatched, d.waitWhileWatched),
     screenSaver: oneOf(s.screenSaver, ['pause', 'replace'] as const, d.screenSaver),
     blur: oneOf(s.blur, ['off', 'screensaver', 'always'] as const, d.blur),
+    screenSaverMinutes: Math.round(num(s.screenSaverMinutes, d.screenSaverMinutes, 0, 600)),
     blurStrength: num(s.blurStrength, d.blurStrength, 0.3, 1),
     position: oneOf(s.position, ['center', 'top-left', 'top-right', 'bottom-left', 'bottom-right'] as const, d.position),
     mouseRule: oneOf(s.mouseRule, ['onto-eyes', 'any', 'never'] as const, d.mouseRule),
