@@ -1,99 +1,107 @@
 import { describe, expect, it } from 'vitest';
-import { defaultSettings, isWatching, makeFace, normalizeSettings, PresenceCheck } from '../src/core';
+import {
+  AttentionEstimator,
+  defaultSettings,
+  makeFace,
+  mergeSettings,
+  normalizeSettings,
+  PresenceCheck,
+  type FaceObservation,
+} from '../src/core';
 import { parsePmsetAssertions } from '../src/main/system';
 
-const reader = makeFace({ center: { x: 0.5, y: 0.5 }, size: 0.3, yaw: 5, pitch: 25, gaze: { x: 0, y: -0.5 } });
-const turnedAway = makeFace({ center: { x: 0.5, y: 0.5 }, size: 0.3, yaw: 70, pitch: 0 });
+// Values measured on a MacBook Pro with a calibrated user (reference yaw 2.2, pitch 12.5, gaze 0.15, 0.11).
+const attention = mergeSettings(defaultSettings(), {
+  attention: { reference: { yaw: 2.2, pitch: 12.5, gaze: { x: 0.15, y: 0.11 } } },
+}).attention;
+const atScreen = (): FaceObservation =>
+  makeFace({ center: { x: 0.5, y: 0.5 }, size: 0.3, yaw: 1.3, pitch: 12.5, gaze: { x: 0.18, y: 0.12 } });
+const atPhone = (): FaceObservation =>
+  makeFace({ center: { x: 0.5, y: 0.6 }, size: 0.3, yaw: 23, pitch: 4, gaze: { x: -0.35, y: -0.46 } });
 
-describe('isWatching', () => {
-  it('a person reading the screen counts, even looking down at the text', () => {
-    expect(isWatching(reader)).toBe(true);
-  });
+/** Feeds faces at 20 frames per second from `from` to `to`, returning the first result. */
+function feed(p: PresenceCheck, faces: () => FaceObservation[], from: number, to: number): 'watched' | 'nobody' | null {
+  for (let t = from; t < to; t += 0.05) {
+    p.report(faces(), t);
+    const r = p.result(t);
+    if (r) return r;
+  }
+  return null;
+}
 
-  it('a person turned away, a tiny far face, or a side camera does not count', () => {
-    expect(isWatching(turnedAway)).toBe(false);
-    expect(isWatching({ ...reader, size: 0.02 })).toBe(false);
-    expect(isWatching({ ...reader, camera: 1 })).toBe(false);
-  });
-});
+const timing = { checkSeconds: 3, startTimeoutSeconds: 15, warmupSeconds: 1, recheckSeconds: 15 };
 
-describe('PresenceCheck', () => {
-  it('someone watching: wait, then check again later', () => {
-    const p = new PresenceCheck({ checkSeconds: 3, startTimeoutSeconds: 15, warmupSeconds: 0, recheckSeconds: 15 });
-    expect(p.due(30)).toBe(true);
-    p.start(30);
-    expect(p.result(30.5)).toBeNull();
-    p.report([reader], 30.6);
-    expect(p.result(31)).toBe('watched');
+describe('PresenceCheck uses the eye contact process', () => {
+  it('looking at the screen: the eyes wait, and check again later', () => {
+    const p = new PresenceCheck(timing);
+    p.start(30, attention);
+    expect(feed(p, () => [atScreen()], 30.2, 36)).toBe('watched');
     expect(p.due(40)).toBe(false);
-    expect(p.due(46)).toBe(true);
+    expect(p.due(46.5)).toBe(true);
   });
 
-  it('nobody watching: show after the check time', () => {
-    const p = new PresenceCheck({ checkSeconds: 3, startTimeoutSeconds: 15, warmupSeconds: 0, recheckSeconds: 15 });
-    p.start(30);
-    p.report([turnedAway], 30.2);
-    expect(p.result(32)).toBeNull();
-    expect(p.result(33.3)).toBe('nobody');
-    expect(p.phase).toBe('idle');
+  it('sitting there looking at a phone: the eyes appear', () => {
+    const p = new PresenceCheck(timing);
+    p.start(30, attention);
+    expect(feed(p, () => [atPhone()], 30.2, 36)).toBe('nobody');
   });
 
-  it('a slow camera start does not count as "nobody" (the check waits for the first frame)', () => {
-    const p = new PresenceCheck({ checkSeconds: 3, startTimeoutSeconds: 15, warmupSeconds: 0, recheckSeconds: 15 });
-    p.start(30);
-    // The camera and face model need 5 s to start: no frames yet, still checking.
-    expect(p.result(35)).toBeNull();
-    p.report([], 35.5);
-    expect(p.result(36)).toBeNull();
-    p.report([reader], 36.2);
-    expect(p.result(36.3)).toBe('watched');
+  it('nobody in front of the camera: the eyes appear after warm-up plus the check time', () => {
+    const p = new PresenceCheck(timing);
+    p.start(30, attention);
+    p.report([], 30.5);
+    expect(p.result(34.4)).toBeNull();
+    expect(p.result(34.6)).toBe('nobody');
+  });
+
+  it('a single glance at the screen is not enough (smoothed, like eye contact)', () => {
+    const p = new PresenceCheck(timing);
+    p.start(0, attention);
+    let frame = 0;
+    // One screen frame out of every ten, the rest at the phone.
+    expect(feed(p, () => [frame++ % 10 === 0 ? atScreen() : atPhone()], 0.2, 6)).toBe('nobody');
+  });
+
+  it('a slow camera start does not count as "nobody"', () => {
+    const p = new PresenceCheck(timing);
+    p.start(30, attention);
+    expect(p.result(35)).toBeNull(); // no frames yet
+    expect(feed(p, () => [atScreen()], 35.5, 40)).toBe('watched');
   });
 
   it('a camera that never sends a frame gives up after the start timeout', () => {
-    const p = new PresenceCheck({ checkSeconds: 3, startTimeoutSeconds: 15, warmupSeconds: 0, recheckSeconds: 15 });
-    p.start(30);
+    const p = new PresenceCheck(timing);
+    p.start(30, attention);
     expect(p.result(44)).toBeNull();
     expect(p.result(45)).toBe('nobody');
   });
 
-  it('reports outside a check are ignored; reset starts over', () => {
-    const p = new PresenceCheck();
-    p.report([reader], 0);
-    p.start(0);
-    p.report([], 0.5);
-    expect(p.result(10)).toBe('nobody');
-    p.start(20);
-    p.report([reader], 20.05);
-    p.result(20.1);
-    p.reset();
-    expect(p.due(20.2)).toBe(true);
+  it('a side camera never counts as looking at the screen', () => {
+    const p = new PresenceCheck(timing);
+    p.start(0, attention);
+    expect(feed(p, () => [{ ...atScreen(), camera: 1 }], 0.2, 6)).toBe('nobody');
   });
 
-  it('a camera failure never blocks the eyes', () => {
-    const p = new PresenceCheck();
-    p.start(0);
+  it('each check starts fresh; reset and camera failure never block the eyes', () => {
+    const p = new PresenceCheck(timing);
+    p.start(0, attention);
+    expect(feed(p, () => [atScreen()], 0.2, 5)).toBe('watched');
+    p.reset();
+    expect(p.due(5.1)).toBe(true);
+    p.start(5.1, attention);
+    expect(feed(p, () => [atPhone()], 5.2, 11)).toBe('nobody');
+    p.start(20, attention);
     p.fail();
     expect(p.phase).toBe('idle');
-    expect(p.result(1)).toBeNull();
-  });
-});
-
-describe('camera warm-up', () => {
-  it('dark first frames do not end the check as "nobody"', () => {
-    const p = new PresenceCheck({ checkSeconds: 3, startTimeoutSeconds: 15, warmupSeconds: 1, recheckSeconds: 15 });
-    p.start(0);
-    p.report([], 0.5); // first frame, still dark
-    expect(p.result(3.6)).toBeNull(); // 3.1 s of frames is not enough with a 1 s warm-up
-    p.report([reader], 3.8); // exposure settled, the reader is found
-    expect(p.result(3.9)).toBe('watched');
+    expect(p.result(21)).toBeNull();
   });
 
-  it('nobody after warm-up plus the check time', () => {
-    const p = new PresenceCheck();
-    p.start(0);
-    p.report([], 0.5);
-    expect(p.result(4.4)).toBeNull();
-    expect(p.result(4.6)).toBe('nobody');
+  it('makes the same decision as the eyes themselves', () => {
+    const e = new AttentionEstimator(attention);
+    for (let t = 0; t < 2; t += 0.05) e.ingest([atPhone()], t);
+    expect(e.state.isMakingEyeContact).toBe(false);
+    for (let t = 2; t < 4; t += 0.05) e.ingest([atScreen()], t);
+    expect(e.state.isMakingEyeContact).toBe(true);
   });
 });
 

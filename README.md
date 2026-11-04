@@ -96,7 +96,8 @@ springy movement, expressive eyebrows, and wet-looking highlights.
   You can change this to *any mouse movement* or *never* (then only a key or click closes them).
 - Optional: **look into the eyes to close them.** Hold eye contact for a moment, a ring fills up, and they wink goodbye. 😉
 - **They wait while you're looking at the screen** — reading something without touching the keyboard doesn't wake them.
-  (A short camera check before they appear; you can turn this off.)
+  A short camera check before they appear uses the same eye-contact detection as the rest of the app, so looking at
+  your phone doesn't count. (You can turn this off in **Show After**.)
 - They don't take keyboard focus and don't appear while your screen is locked.
 - By default they stay away while the **screen saver** runs. Or choose *Eyes replace the screen saver*, and the eyes appear instead of it.
 - On macOS they also wait while a video or presentation is playing.

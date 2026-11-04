@@ -60,10 +60,18 @@ press or click; anything else is jitter and is ignored.
 ## Waiting while someone looks at the screen
 
 `PresenceCheck` (`src/core/presence.ts`). When the idle time is reached and `waitWhileWatched` is on, the main
-process does not show the eyes at once. It asks the tracker overlay (hidden, but loaded) to open the cameras for up
-3 seconds of frames, after a 1-second warm-up (first frames are often dark) and with a 15-second limit if the camera
-never answers. A face from the main camera with the head within about 35° of the screen counts as "watching".
-Watching: wait and check again after 15 seconds. Nobody: show the eyes. Camera error: show the eyes. Any input resets it.
+process does not show the eyes at once. It asks the tracker overlay (hidden, but loaded) to open the cameras for
+3 seconds of frames, after a 1-second warm-up (first frames are often dark), with a 15-second limit if the camera
+never answers.
+
+"Looking at the screen" is decided by **the same process as eye contact and look-to-close**: each check feeds the
+frames into a fresh `AttentionEstimator` with the user's settings and calibration. Only `isMakingEyeContact`
+counts. So looking at a phone, a book or another screen does not hold the eyes back.
+
+- Someone looks at the screen: wait and check again after 15 seconds.
+- Nobody looks (or nobody is there, or the camera fails): show the eyes.
+- After the eyes were dismissed (key, click, mouse onto the eyes, look-to-close), no checks run until new input
+  (`IdleMonitor.canShow`).
 
 ## Screen saver
 

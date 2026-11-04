@@ -118,3 +118,23 @@ describe('pointInRects', () => {
     expect(pointInRects({ x: 0, y: 0 }, [])).toBe(false);
   });
 });
+
+describe('IdleMonitor.canShow', () => {
+  it('true only when update would show', () => {
+    const m = new IdleMonitor(15);
+    expect(m.canShow(10)).toBe(false);
+    expect(m.canShow(15)).toBe(true);
+    m.update({ idleSeconds: 15, now: 15 });
+    expect(m.canShow(20)).toBe(false); // already showing
+  });
+
+  it('false after a dismissal until new input (no camera checks in that time)', () => {
+    const m = new IdleMonitor(15);
+    m.update({ idleSeconds: 15, now: 15 });
+    m.forceHide(); // for example look-to-close
+    expect(m.canShow(30)).toBe(false);
+    expect(m.canShow(300)).toBe(false);
+    m.update({ idleSeconds: 0, now: 301 }); // the user touches the mouse or keyboard
+    expect(m.canShow(15)).toBe(true);
+  });
+});

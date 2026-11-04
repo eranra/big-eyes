@@ -367,11 +367,18 @@ async function checkIdle(): Promise<void> {
       screenSaverActive = false;
     }
     let blocked = s.paused || screenLocked || overlays.length === 0 || screenSaverActive;
-    const due = !blocked && !idle.isShowing && idleSeconds >= idle.timeout;
+    // `canShow` is false after the eyes were dismissed (key, mouse onto the eyes, or look-to-close) until new
+    // input, so no camera check runs in that time.
+    const due = !blocked && idle.canShow(idleSeconds);
     // Asking for video playback is slower, so do it only right before showing.
     if (due && s.respectVideoPlayback) blocked = await displaySleepPrevented(ownPids());
 
     // "Wait while someone looks at the screen": before showing, take a short look with the camera.
+    if (!due && presence.phase === 'checking' && !idle.isShowing) {
+      debugLog('presence: check stopped (the eyes cannot show now)');
+      presence.reset();
+      setPresenceCamera(false);
+    }
     if (idleSeconds < idle.timeout && presence.phase !== 'idle') {
       debugLog(`presence: reset by input (idle=${idleSeconds.toFixed(1)}s, system=${systemIdle}s, phase=${presence.phase})`);
       presence.reset();
@@ -381,15 +388,16 @@ async function checkIdle(): Promise<void> {
       if (presence.phase === 'checking') {
         const result = presence.result(now);
         if (result === null) return;
-        setPresenceCamera(false);
         if (result === 'watched') {
+          // Close the camera only when the eyes wait. When they show, the overlay keeps using it.
+          setPresenceCamera(false);
           debugLog('presence: someone is looking at the screen, the eyes wait');
           return;
         }
         debugLog('presence: nobody looking, showing the eyes');
       } else if (presence.due(now)) {
         debugLog('presence: checking with the camera');
-        presence.start(now);
+        presence.start(now, s.attention, s.mirrorCamera);
         setPresenceCamera(true);
         return;
       } else {
