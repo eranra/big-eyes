@@ -712,6 +712,15 @@ export interface DisplayInfo {
   bounds: { x: number; y: number; width: number; height: number };
 }
 
+/**
+ * Screens that get only the blur (no eyes): every connected screen that does not show the eyes.
+ * When the eyes replace the screen saver, all screens are blurred, not only the ones with eyes.
+ */
+export function blurOnlyDisplays<T extends DisplayInfo>(all: readonly T[], eyeScreens: readonly T[]): T[] {
+  const ids = new Set(eyeScreens.map((d) => d.id));
+  return all.filter((d) => !ids.has(d.id));
+}
+
 /** Returns the displays that should show the eyes. Never empty when at least one display exists. */
 export function selectDisplays<T extends DisplayInfo>(all: readonly T[], primaryId: number, choice: ScreenChoice): T[] {
   if (all.length === 0) return [];

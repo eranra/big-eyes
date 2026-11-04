@@ -133,6 +133,15 @@ describe('selectDisplays', () => {
     expect(selectDisplays(all, 3, { mode: 'builtin' }).map((x) => x.id)).toEqual([3]);
   });
 
+  it('every screen without eyes gets the blur', async () => {
+    const { blurOnlyDisplays } = await import('../src/core');
+    const withInternal = [d(1), { ...d(2), internal: true }, d(3)];
+    const eyes = selectDisplays(withInternal, 1, { mode: 'builtin' });
+    expect(blurOnlyDisplays(withInternal, eyes).map((x) => x.id)).toEqual([1, 3]);
+    expect(blurOnlyDisplays(all, selectDisplays(all, 2, { mode: 'all' }))).toEqual([]);
+    expect(blurOnlyDisplays(all, selectDisplays(all, 2, { mode: 'selected', ids: [3] })).map((x) => x.id)).toEqual([1, 2]);
+  });
+
   it('falls back to the primary display when selected displays are gone', () => {
     expect(selectDisplays(all, 2, { mode: 'selected', ids: [9] }).map((x) => x.id)).toEqual([2]);
     expect(selectDisplays(all, 42, { mode: 'primary' }).map((x) => x.id)).toEqual([1]);

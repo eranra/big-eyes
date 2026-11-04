@@ -5,6 +5,13 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.3] - 2026-11-04
+
+### Fixed
+
+- With more than one screen, the blur (when the eyes replace the screen saver) now covers **all** screens. The eyes
+  stay on the screens chosen in **Screens**; every other screen gets the blur only.
+
 ## [0.3.2] - 2026-11-04
 
 ### Added
