@@ -10,7 +10,9 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - **Blur behind the eyes**: when the eyes replace the screen saver, the normal eyes appear as usual, and once the
   screen saver time is reached the screen behind them is blurred at full strength. Turn it off in
   **Screen Saver → Blur the Screen Behind the Eyes**, or choose blur always. The strength can be lowered.
-- **Screen Saver Starts After**: same as the system (screen saver time, or else display sleep time) or a fixed time.
+- **Screen Saver Starts After**: same as the system, or a fixed time. The system time is read at start and when it
+  changes (no polling): macOS managed (IT) policy, then System Settings, then display sleep; Windows group policy,
+  then the screen saver setting, then the monitor-off time; Linux GNOME idle delay or KDE screen locker timeout.
   macOS uses the system blur, Windows 11 uses acrylic, Linux uses a strong tint.
 - A log file of app events (shows, hides and why, camera checks, locks, sleeps), for finding problems later:
   `~/Library/Logs/Big Eyes/main.log` on macOS. No images or face data are written.

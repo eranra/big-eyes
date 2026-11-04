@@ -20,6 +20,8 @@ const api: BigEyesApi = {
   getDisplays: () => ipcRenderer.invoke(IPC.getDisplays),
   onSettings: (listener) => void ipcRenderer.on(IPC.settings, (_e, s) => listener(s)),
   onVisibility: (listener) => void ipcRenderer.on(IPC.visibility, (_e, v) => listener(Boolean(v))),
+  getSaverTime: () => ipcRenderer.invoke(IPC.getSaverTime),
+  onSaverTime: (listener) => void ipcRenderer.on(IPC.saverTime, (_e, t) => listener(t)),
   onBlur: (listener) => void ipcRenderer.on(IPC.blur, (_e, on) => listener(Boolean(on))),
   onCalibrate: (listener) => void ipcRenderer.on(IPC.calibrate, () => listener()),
   onFaces: (listener) => void ipcRenderer.on(IPC.facesBroadcast, (_e, m) => listener(m)),

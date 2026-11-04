@@ -107,27 +107,109 @@ const run = (cmd: string, args: string[]): Promise<string | null> =>
     execFile(cmd, args, { timeout: 3000, windowsHide: true }, (error, stdout) => resolve(error ? null : String(stdout))),
   );
 
+/** Where a screen saver time was found. Shown in the log and in Settings. */
+export type SaverTimeSource =
+  | 'managed policy'
+  | 'screen saver setting'
+  | 'display sleep'
+  | 'group policy'
+  | 'monitor off'
+  | 'GNOME'
+  | 'KDE';
+
+export interface SaverTime {
+  seconds: number;
+  source: SaverTimeSource;
+}
+
+/** Reads `idleTime` from a plist file with plutil. Returns seconds, or null when it is missing or 0. */
+async function plistIdleTime(file: string): Promise<number | null> {
+  const out = await run('/usr/bin/plutil', ['-extract', 'idleTime', 'raw', '-o', '-', file]);
+  const n = Number(out?.trim());
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/** macOS: the files that hold the screen saver time. Watched for changes. */
+export function macSaverFiles(user = os.userInfo().username): string[] {
+  return [
+    `/Library/Managed Preferences/${user}/com.apple.screensaver.plist`,
+    '/Library/Managed Preferences/com.apple.screensaver.plist',
+    path.join(os.homedir(), 'Library/Preferences/ByHost'),
+  ];
+}
+
+/** Parses `reg query` output for one REG_SZ or REG_DWORD value. Exported for tests. */
+export function parseRegValue(output: string | null, name: string): string | null {
+  if (!output) return null;
+  const m = new RegExp(`${name}\\s+REG_(?:SZ|DWORD)\\s+(\\S+)`, 'i').exec(output);
+  if (!m) return null;
+  return m[1]!.startsWith('0x') ? String(parseInt(m[1]!, 16)) : m[1]!;
+}
+
+/** Parses `powercfg /q` output for the "Turn off display after" AC value, in seconds. Exported for tests. */
+export function parsePowercfgDisplayTimeout(output: string | null): number | null {
+  if (!output) return null;
+  const m = /Current AC Power Setting Index:\s*0x([0-9a-f]+)/i.exec(output);
+  const n = m ? parseInt(m[1]!, 16) : NaN;
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/** Parses `[Daemon] Timeout=10` (minutes) from kscreenlockerrc. Exported for tests. */
+export function parseKdeTimeout(text: string | null): number | null {
+  if (!text) return null;
+  const m = /^\s*Timeout\s*=\s*(\d+)/m.exec(text);
+  const n = m ? Number(m[1]) : NaN;
+  return n > 0 ? n * 60 : null;
+}
+
+/** Parses `gsettings get org.gnome.desktop.session idle-delay` ("uint32 600"). Exported for tests. */
+export function parseGnomeIdleDelay(text: string | null): number | null {
+  const m = text && /(\d+)\s*$/.exec(text.trim());
+  const n = m ? Number(m[1]) : NaN;
+  return n > 0 ? n : null;
+}
+
 /**
- * The time (seconds) after which this computer would start its screen saver, or null if it has none.
- * - macOS: the screen saver time if set; otherwise the display sleep time (the display turns off and,
- *   usually, the screen locks).
- * - Windows: the screen saver timeout, if a screen saver is on.
- * - Linux: not read (null).
+ * The time after which this computer would start its screen saver, and where it was found. Null if none.
+ *
+ * - macOS: managed policy (IT profile) for this user, then for all users, then the user's own screen saver
+ *   setting, then the display sleep time.
+ * - Windows: group policy, then the user's screen saver (if it is on), then the "turn off display" time.
+ * - Linux: GNOME idle delay, then the KDE screen locker timeout.
  */
-export async function systemScreenSaverSeconds(): Promise<number | null> {
+export async function systemScreenSaverTime(): Promise<SaverTime | null> {
   if (process.platform === 'darwin') {
-    const saver = Number((await run('/usr/bin/defaults', ['-currentHost', 'read', 'com.apple.screensaver', 'idleTime']))?.trim());
-    if (Number.isFinite(saver) && saver > 0) return saver;
+    const [userManaged, allManaged] = macSaverFiles();
+    for (const file of [userManaged!, allManaged!]) {
+      const seconds = await plistIdleTime(file);
+      if (seconds) return { seconds, source: 'managed policy' };
+    }
+    const own = Number((await run('/usr/bin/defaults', ['-currentHost', 'read', 'com.apple.screensaver', 'idleTime']))?.trim());
+    if (Number.isFinite(own) && own > 0) return { seconds: own, source: 'screen saver setting' };
     const minutes = parseDisplaySleepMinutes((await run('/usr/bin/pmset', ['-g'])) ?? '');
-    return minutes && minutes > 0 ? minutes * 60 : null;
+    return minutes && minutes > 0 ? { seconds: minutes * 60, source: 'display sleep' } : null;
   }
   if (process.platform === 'win32') {
-    const key = 'HKCU\\Control Panel\\Desktop';
-    const active = await run('reg', ['query', key, '/v', 'ScreenSaveActive']);
-    if (!active || !/ScreenSaveActive\s+REG_SZ\s+1/.test(active)) return null;
-    const timeout = await run('reg', ['query', key, '/v', 'ScreenSaveTimeOut']);
-    const m = timeout && /ScreenSaveTimeOut\s+REG_SZ\s+(\d+)/.exec(timeout);
-    return m ? Number(m[1]) : null;
+    const policy = await run('reg', ['query', 'HKCU\\Software\\Policies\\Microsoft\\Windows\\Control Panel\\Desktop']);
+    const policyTimeout = Number(parseRegValue(policy, 'ScreenSaveTimeOut'));
+    if (policyTimeout > 0 && parseRegValue(policy, 'ScreenSaveActive') !== '0') return { seconds: policyTimeout, source: 'group policy' };
+    const desktop = await run('reg', ['query', 'HKCU\\Control Panel\\Desktop']);
+    const timeout = Number(parseRegValue(desktop, 'ScreenSaveTimeOut'));
+    if (parseRegValue(desktop, 'ScreenSaveActive') === '1' && timeout > 0) return { seconds: timeout, source: 'screen saver setting' };
+    const display = parsePowercfgDisplayTimeout(await run('powercfg', ['/q', 'SCHEME_CURRENT', 'SUB_VIDEO', 'VIDEOIDLE']));
+    return display ? { seconds: display, source: 'monitor off' } : null;
+  }
+  if (process.platform === 'linux') {
+    const gnome = parseGnomeIdleDelay(await run('gsettings', ['get', 'org.gnome.desktop.session', 'idle-delay']));
+    if (gnome) return { seconds: gnome, source: 'GNOME' };
+    const configHome = process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config');
+    const kde = parseKdeTimeout(await fs.readFile(path.join(configHome, 'kscreenlockerrc'), 'utf8').catch(() => null));
+    if (kde) return { seconds: kde, source: 'KDE' };
   }
   return null;
+}
+
+/** Seconds only, for callers that do not need the source. */
+export async function systemScreenSaverSeconds(): Promise<number | null> {
+  return (await systemScreenSaverTime())?.seconds ?? null;
 }
