@@ -92,7 +92,10 @@ describe('eye position', () => {
     expect(at('top-left').cx).toBeLessThan(W / 3);
     expect(at('top-left').cy).toBeLessThan(H / 3);
     expect(at('top-right').cx).toBeGreaterThan((W * 2) / 3);
-    expect(at('bottom-left').cy).toBeGreaterThan((H * 2) / 3);
+    // The eyes sit a bit higher than the bottom third, because the mouth is under them.
+    const bottom = eyeBounds(at('bottom-left'));
+    expect(bottom.y + bottom.height).toBeGreaterThan(H * 0.85);
+    expect(at('bottom-left').cy).toBeGreaterThan(H * 0.6);
     expect(at('bottom-right').cx).toBeGreaterThan((W * 2) / 3);
     expect(at('center').cx).toBeCloseTo(W / 2, 0);
   });

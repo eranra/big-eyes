@@ -1,5 +1,22 @@
 import { clamp, type Vec2 } from './math';
 
+/** A camera saved in the settings. The id can change (for example after plugging in again), so the name is kept too. */
+export interface SavedCamera {
+  id: string;
+  label: string;
+}
+
+/** Which cameras watch for people. */
+export type CameraChoice =
+  /** The computer's own camera (FaceTime / MacBook / "Integrated"), else the system default. */
+  | { mode: 'builtin' }
+  /** Whatever camera the system offers first. */
+  | { mode: 'default' }
+  /** Every connected camera. */
+  | { mode: 'all' }
+  /** The chosen cameras. The first one is the main camera (the eyes follow what it sees). */
+  | { mode: 'selected'; cameras: SavedCamera[] };
+
 /** Which screens show the eyes. */
 export type ScreenChoice =
   /** The laptop's built-in screen. Falls back to the main screen when there is none (desktop Macs, PCs). */
@@ -45,6 +62,12 @@ export interface MoodSettings {
   surpriseDuration: number;
   /** Nobody in front of the camera this long (s) makes the eyes fall asleep. */
   absentToSleep: number;
+  /** Smile back: when the person smiles at the eyes, they smile back (the "delighted" mood). */
+  smileBack: boolean;
+  /** The person must smile this long (s) before the eyes smile back. */
+  smileToDelighted: number;
+  /** After the person stops smiling, the eyes keep smiling this long (s). */
+  delightedHold: number;
 }
 
 /** Where the eyes sit on the screen. */
@@ -81,16 +104,8 @@ export interface Settings {
   eyeSize: number;
   /** Which screens show the eyes. */
   screens: ScreenChoice;
-  /**
-   * Which camera to use when `cameraId` is not set:
-   * - 'builtin': the computer's own camera (FaceTime / MacBook / "Integrated" camera), else the system default;
-   * - 'default': whatever the system offers first.
-   */
-  cameraKind: 'builtin' | 'default';
-  /** A specific camera `deviceId` from `navigator.mediaDevices.enumerateDevices()`. `null` = use `cameraKind`. */
-  cameraId: string | null;
-  /** Camera label, kept so the menu can show a name before the camera list is loaded. */
-  cameraLabel: string | null;
+  /** Which cameras watch for people. */
+  cameras: CameraChoice;
   /** How dark the screen behind the eyes gets, 0 (fully transparent over your apps) .. 0.95. */
   backgroundDim: number;
   /** Iris color as a CSS hex color, for example "#3d85dc". */
@@ -149,6 +164,10 @@ export interface LookSettings {
   showLashes: boolean;
   /** Pink cheeks when the eyes smile. */
   showBlush: boolean;
+  /** A mouth under the eyes. It smiles back when you smile. */
+  showMouth: boolean;
+  /** Color of the lips. */
+  mouthColor: string;
 }
 
 /** Ready-made looks. Each one sets the iris color and the whole `look`. */
@@ -173,6 +192,8 @@ export const THEMES: ReadonlyArray<{ id: string; label: string; irisColor: strin
       showBrows: true,
       showLashes: true,
       showBlush: true,
+      showMouth: true,
+      mouthColor: '#d9667f',
     },
   },
   {
@@ -195,6 +216,8 @@ export const THEMES: ReadonlyArray<{ id: string; label: string; irisColor: strin
       showBrows: true,
       showLashes: false,
       showBlush: true,
+      showMouth: true,
+      mouthColor: '#5a2e1e',
     },
   },
   {
@@ -217,6 +240,8 @@ export const THEMES: ReadonlyArray<{ id: string; label: string; irisColor: strin
       showBrows: false,
       showLashes: false,
       showBlush: false,
+      showMouth: true,
+      mouthColor: '#29e3ff',
     },
   },
   {
@@ -239,6 +264,8 @@ export const THEMES: ReadonlyArray<{ id: string; label: string; irisColor: strin
       showBrows: false,
       showLashes: true,
       showBlush: false,
+      showMouth: true,
+      mouthColor: '#3a2a22',
     },
   },
   {
@@ -261,6 +288,8 @@ export const THEMES: ReadonlyArray<{ id: string; label: string; irisColor: strin
       showBrows: true,
       showLashes: true,
       showBlush: false,
+      showMouth: true,
+      mouthColor: '#8a1c1c',
     },
   },
 ];
@@ -358,9 +387,7 @@ export function defaultSettings(): Settings {
     blink: { rate: 1, speed: 1 },
     eyeSize: 1,
     screens: { mode: 'builtin' },
-    cameraKind: 'builtin',
-    cameraId: null,
-    cameraLabel: null,
+    cameras: { mode: 'builtin' },
     backgroundDim: 0.35,
     irisColor: THEMES[0]!.irisColor,
     look: { ...THEMES[0]!.look },
@@ -391,6 +418,9 @@ export function defaultSettings(): Settings {
       awayToBored: 2.5,
       surpriseDuration: 0.9,
       absentToSleep: 8,
+      smileBack: true,
+      smileToDelighted: 0.3,
+      delightedHold: 1.2,
     },
   };
 }
@@ -414,10 +444,6 @@ function text(v: unknown, fallback: string, maxLength = 40): string {
   return typeof v === 'string' ? v.slice(0, maxLength) : fallback;
 }
 
-function optionalText(v: unknown, fallback: string | null, maxLength = 256): string | null {
-  if (v === null) return null;
-  return typeof v === 'string' && v.length > 0 ? v.slice(0, maxLength) : fallback;
-}
 
 function color(v: unknown, fallback: string): string {
   return typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v) ? v.toLowerCase() : fallback;
@@ -426,6 +452,39 @@ function color(v: unknown, fallback: string): string {
 function vec2(v: unknown, fallback: Vec2, limit: number): Vec2 {
   if (!isObj(v)) return fallback;
   return { x: num(v.x, fallback.x, -limit, limit), y: num(v.y, fallback.y, -limit, limit) };
+}
+
+function savedCamera(v: unknown): SavedCamera | null {
+  if (!isObj(v) || typeof v.id !== 'string' || typeof v.label !== 'string') return null;
+  if (!v.id && !v.label) return null;
+  return { id: v.id.slice(0, 256), label: v.label.slice(0, 256) };
+}
+
+/**
+ * Reads the camera choice. Also converts settings files from version 0.1.0, which had
+ * `cameraKind` ('builtin' | 'default') plus an optional `cameraId` / `cameraLabel`.
+ */
+function cameraChoice(s: Obj, fallback: CameraChoice): CameraChoice {
+  const v = s.cameras;
+  if (isObj(v)) {
+    if (v.mode === 'builtin' || v.mode === 'default' || v.mode === 'all') return { mode: v.mode };
+    if (v.mode === 'selected' && Array.isArray(v.cameras)) {
+      const seen = new Set<string>();
+      const cameras = v.cameras
+        .map(savedCamera)
+        .filter((c): c is SavedCamera => c !== null && !seen.has(c.id || c.label) && Boolean(seen.add(c.id || c.label)))
+        .slice(0, 8);
+      return cameras.length ? { mode: 'selected', cameras } : fallback;
+    }
+    return fallback;
+  }
+  // Version 0.1.0 settings.
+  const id = typeof s.cameraId === 'string' ? s.cameraId : '';
+  const label = typeof s.cameraLabel === 'string' ? s.cameraLabel : '';
+  if (id || label) return { mode: 'selected', cameras: [{ id: id.slice(0, 256), label: label.slice(0, 256) }] };
+  if (s.cameraKind === 'default') return { mode: 'default' };
+  if (s.cameraKind === 'builtin') return { mode: 'builtin' };
+  return fallback;
 }
 
 function screens(v: unknown, fallback: ScreenChoice): ScreenChoice {
@@ -460,6 +519,8 @@ function look(v: unknown, d: LookSettings): LookSettings {
     showBrows: bool(l.showBrows, d.showBrows),
     showLashes: bool(l.showLashes, d.showLashes),
     showBlush: bool(l.showBlush, d.showBlush),
+    showMouth: bool(l.showMouth, d.showMouth),
+    mouthColor: color(l.mouthColor, d.mouthColor),
   };
 }
 
@@ -484,9 +545,7 @@ export function normalizeSettings(input: unknown): Settings {
     },
     eyeSize: num(s.eyeSize, d.eyeSize, 0.2, 2.5),
     screens: screens(s.screens, d.screens),
-    cameraKind: oneOf(s.cameraKind, ['builtin', 'default'] as const, d.cameraKind),
-    cameraId: optionalText(s.cameraId, d.cameraId),
-    cameraLabel: optionalText(s.cameraLabel, d.cameraLabel),
+    cameras: cameraChoice(s, d.cameras),
     backgroundDim: num(s.backgroundDim, d.backgroundDim, 0, 0.95),
     irisColor: color(s.irisColor, d.irisColor),
     look: look(s.look, d.look),
@@ -518,6 +577,9 @@ export function normalizeSettings(input: unknown): Settings {
       awayToBored: num(m.awayToBored, dm.awayToBored, 0, 60),
       surpriseDuration: num(m.surpriseDuration, dm.surpriseDuration, 0, 5),
       absentToSleep: num(m.absentToSleep, dm.absentToSleep, 0, 600),
+      smileBack: bool(m.smileBack, dm.smileBack),
+      smileToDelighted: num(m.smileToDelighted, dm.smileToDelighted, 0, 5),
+      delightedHold: num(m.delightedHold, dm.delightedHold, 0, 10),
     },
   };
 }

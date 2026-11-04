@@ -8,6 +8,8 @@ const person = (contact: boolean): PersonState => ({
   contactScore: contact ? 1 : 0,
   isMakingEyeContact: contact,
   smile: 0,
+  isSmiling: false,
+  seenByMainCamera: true,
   lastSeen: 0,
 });
 

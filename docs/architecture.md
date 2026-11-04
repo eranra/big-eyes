@@ -50,6 +50,23 @@ Only one overlay window (the one on the main screen, when it is selected) opens 
 It sends the faces to the main process, which forwards them to the overlays on the other screens.
 Each overlay runs its own animator, so all screens show the same behavior.
 
+## Several cameras
+
+The tracker opens every chosen camera, each with its own MediaPipe landmarker, and processes them in turn
+(about 20 detections per second in total). Every face carries the index of its camera; 0 is the main camera.
+
+`AttentionEstimator.ingest()` uses the main camera for position and eye contact, because only the camera next to
+the eyes can tell whether you look *at the eyes*. When the main camera sees nobody, a face on another camera keeps
+the person present, the eyes keep their last position, and eye contact fades. Smiles count from any camera.
+
+## Smiles
+
+MediaPipe's `mouthSmileLeft` / `mouthSmileRight` blendshapes give a smile score. It is smoothed, and the decision
+uses two thresholds (on at 0.45, off at 0.25). `MoodMachine` enters **delighted** when the person smiles for
+`smileToDelighted` seconds while making eye contact (or while the eyes are already happy), and leaves it
+`delightedHold` seconds after the smile ends. The mouth springs follow the mood; when delighted the mouth also
+opens with how much the person smiles.
+
 ## How eye contact is decided
 
 For each face, MediaPipe gives:
@@ -74,7 +91,8 @@ point of view. With a MacBook Pro camera we measured pitch about +10° and eye d
 | sleeping | nobody seen for 8 s | lids closed, slow breathing, `z z z` |
 | surprised | a person appears after sleep, or after 2 s of nobody | wide open, small pupils, raised brows, a "pop" |
 | curious | a person is there, no eye contact yet | follows the person, small eye jumps |
-| happy | eye contact for 0.45 s (kept 0.7 s after it ends) | crescent "smiling" eyes, cheeks, "Welcome" |
+| happy | eye contact for 0.45 s (kept 0.7 s after it ends) | crescent "smiling" eyes, cheeks, gentle smile |
+| delighted | the person smiles at the eyes for 0.3 s | big crescent eyes, open smile with teeth, bounce |
 | bored | no eye contact for 2.5 s | heavy tilted lids, low brows, looks away, "Bored" |
 
 All times are settings (`mood.*` in `settings.json`).

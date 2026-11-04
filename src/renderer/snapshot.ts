@@ -20,6 +20,7 @@ window.snapshotMoods = [...MOODS, ...THEMES.map((t) => `theme-${t.id}` as Mood),
 window.renderMood = (name: Mood): void => {
   const theme = THEMES.find((t) => `theme-${t.id}` === name);
   const special = (name as string) === 'corner' || (name as string) === 'goodbye';
+  // The README shows each mood without text.
   const mood: Mood = theme ? 'curious' : special ? 'happy' : name;
   const dpr = window.devicePixelRatio || 1;
   const w = window.innerWidth;

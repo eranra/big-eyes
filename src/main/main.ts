@@ -92,7 +92,11 @@ const nowSeconds = (): number => performance.now() / 1000;
 function effectiveSettings(): Settings {
   let s = store.get();
   if (FORCE_DEBUG) s = { ...s, showDebugInfo: true };
-  if (CAMERA_NAME) s = { ...s, cameraId: null, cameraLabel: CAMERA_NAME };
+  if (CAMERA_NAME) {
+    // --camera-name=A,B uses the cameras whose names contain A and B (A is the main camera).
+    const cameras = CAMERA_NAME.split(',').map((label) => ({ id: '', label: label.trim() }));
+    s = { ...s, cameras: { mode: 'selected', cameras } };
+  }
   return s;
 }
 

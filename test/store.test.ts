@@ -23,13 +23,13 @@ describe('SettingsStore', () => {
   it('saves updates and loads them again', async () => {
     const dir = tempDir();
     const store = new SettingsStore(dir);
-    store.update({ eyeSize: 1.35, screens: { mode: 'primary' }, cameraLabel: 'MacBook Pro Camera' });
+    store.update({ eyeSize: 1.35, screens: { mode: 'primary' }, cameras: { mode: 'all' } });
     await store.flush();
     const saved = JSON.parse(readFileSync(join(dir, 'settings.json'), 'utf8'));
     expect(saved.eyeSize).toBe(1.35);
     const again = new SettingsStore(dir);
     expect(again.get().screens).toEqual({ mode: 'primary' });
-    expect(again.get().cameraLabel).toBe('MacBook Pro Camera');
+    expect(again.get().cameras).toEqual({ mode: 'all' });
   });
 
   it('notifies listeners only on real changes', () => {

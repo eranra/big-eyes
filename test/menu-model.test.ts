@@ -75,22 +75,41 @@ describe('camera menu', () => {
     expect(checked(cameraMenu(defaultSettings(), cameras))).toEqual(['Built-in Camera']);
   });
 
-  it('lists cameras and the default', () => {
-    const s = mergeSettings(defaultSettings(), { cameraId: 'int', cameraLabel: 'MacBook Pro Camera' });
-    const menu = cameraMenu(s, cameras);
-    expect(checked(menu)).toEqual(['MacBook Pro Camera (built-in)']);
+  it('modes and per-camera checkboxes', () => {
+    const menu = cameraMenu(defaultSettings(), cameras);
+    expect(find(menu.submenu!, 'All Cameras').action).toEqual({ kind: 'patch', patch: { cameras: { mode: 'all' } } });
     expect(find(menu.submenu!, 'HD Pro Webcam C920').action).toEqual({
       kind: 'patch',
-      patch: { cameraId: 'ext', cameraLabel: 'HD Pro Webcam C920' },
-    });
-    expect(find(menu.submenu!, 'System Default').action).toEqual({
-      kind: 'patch',
-      patch: { cameraKind: 'default', cameraId: null, cameraLabel: null },
+      patch: { cameras: { mode: 'selected', cameras: [{ id: 'ext', label: 'HD Pro Webcam C920' }] } },
     });
   });
 
+  it('adds a second camera and marks the main one', () => {
+    const s = mergeSettings(defaultSettings(), { cameras: { mode: 'selected', cameras: [{ id: 'int', label: 'MacBook Pro Camera' }] } });
+    const one = cameraMenu(s, cameras);
+    const builtIn = one.submenu!.find((n) => n.label?.startsWith('MacBook Pro Camera'))!;
+    expect(builtIn.checked).toBe(true);
+    expect(builtIn.enabled).toBe(false); // the last camera cannot be turned off
+    expect(one.submenu!.find((n) => n.label === 'HD Pro Webcam C920')!.action).toEqual({
+      kind: 'patch',
+      patch: {
+        cameras: {
+          mode: 'selected',
+          cameras: [
+            { id: 'int', label: 'MacBook Pro Camera' },
+            { id: 'ext', label: 'HD Pro Webcam C920' },
+          ],
+        },
+      },
+    });
+    const two = mergeSettings(s, {
+      cameras: { mode: 'selected', cameras: [{ id: 'int', label: 'MacBook Pro Camera' }, { id: 'ext', label: 'HD Pro Webcam C920' }] },
+    });
+    expect(checked(cameraMenu(two, cameras))).toEqual(['MacBook Pro Camera (built-in) — main', 'HD Pro Webcam C920']);
+  });
+
   it('keeps a saved camera that is not connected', () => {
-    const s = mergeSettings(defaultSettings(), { cameraId: 'gone', cameraLabel: 'Old Cam' });
+    const s = mergeSettings(defaultSettings(), { cameras: { mode: 'selected', cameras: [{ id: 'gone', label: 'Old Cam' }] } });
     expect(checked(cameraMenu(s, cameras))).toEqual(['Old Cam (not connected)']);
   });
 });

@@ -1,5 +1,6 @@
 import { EyeAnimator } from '../core/animator';
-import { chooseCamera } from '../core/camera';
+import { chooseCameras, findCamera, isBuiltInCamera } from '../core/camera';
+import type { CameraInfo } from '../core/ipc';
 import type { BigEyesApi, DisplaySummary } from '../core/ipc';
 import type { Mood } from '../core/mood';
 import { defaultSettings, EYE_SHAPES, IRIS_PRESETS, MOUSE_RULES, POSITIONS, PUPIL_SHAPES, IRIS_STYLES, matchingTheme, THEMES, type LookSettings, type Settings } from '../core/settings';
@@ -17,6 +18,7 @@ const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) 
 let settings: Settings = defaultSettings();
 let displays: DisplaySummary[] = [];
 let previewMood: Mood = 'curious';
+let previousCameras: Settings['cameras'] = defaultSettings().cameras;
 const defaults = defaultSettings();
 
 if (navigator.userAgent.includes('Macintosh')) document.body.classList.add('mac');
@@ -44,7 +46,10 @@ function fakeFaces(mood: Mood, t: number) {
         ? []
         : [{ center: { x, y }, size: 0.3, yaw: 30, pitch: 0, gaze: null, smile: 0, blink: 0, confidence: 1 }];
     case 'happy':
-      return [{ center: { x, y }, size: 0.3, ...looking, smile: 0.3, blink: 0, confidence: 1 }];
+      return [{ center: { x, y }, size: 0.3, ...looking, smile: 0.1, blink: 0, confidence: 1 }];
+    case 'delighted':
+      // Looking at the eyes and smiling, a bit more and a bit less over time.
+      return [{ center: { x, y }, size: 0.3, ...looking, smile: 0.75 + Math.sin(t * 1.3) * 0.2, blink: 0, confidence: 1 }];
     case 'bored':
       return [{ center: { x, y }, size: 0.3, yaw: 40, pitch: 0, gaze: { x: 0.8, y: 0 }, smile: 0, blink: 0, confidence: 1 }];
     default:
@@ -57,7 +62,7 @@ function resetPreview(): void {
   // Short dwell times so the preview reaches the chosen mood quickly.
   const quick: Settings = {
     ...settings,
-    mood: { contactToHappy: 0.2, happyHold: 0.4, awayToBored: 0.6, surpriseDuration: 99, absentToSleep: 0.5 },
+    mood: { ...settings.mood, smileBack: true, contactToHappy: 0.2, happyHold: 0.4, awayToBored: 0.6, surpriseDuration: 99, absentToSleep: 0.5, smileToDelighted: 0.2 },
   };
   if (previewMood === 'curious') {
     // Curious: the person looks around but the eyes never get bored.
@@ -194,8 +199,8 @@ for (const key of lookNumbers) {
     save({ look: { [key]: value } });
   });
 }
-type LookColor = 'scleraColor' | 'lidColor' | 'browColor' | 'lashColor' | 'glowColor';
-const lookColors: LookColor[] = ['scleraColor', 'lidColor', 'browColor', 'lashColor', 'glowColor'];
+type LookColor = 'scleraColor' | 'lidColor' | 'browColor' | 'lashColor' | 'glowColor' | 'mouthColor';
+const lookColors: LookColor[] = ['scleraColor', 'lidColor', 'browColor', 'lashColor', 'glowColor', 'mouthColor'];
 for (const key of lookColors) {
   const input = $<HTMLInputElement>(key);
   input.addEventListener('input', () => {
@@ -203,8 +208,8 @@ for (const key of lookColors) {
     save({ look: { [key]: input.value } });
   });
 }
-type LookBool = 'showBrows' | 'showLashes' | 'showBlush';
-const lookBools: LookBool[] = ['showBrows', 'showLashes', 'showBlush'];
+type LookBool = 'showBrows' | 'showLashes' | 'showBlush' | 'showMouth';
+const lookBools: LookBool[] = ['showBrows', 'showLashes', 'showBlush', 'showMouth'];
 for (const key of lookBools) {
   const input = $<HTMLInputElement>(key);
   input.addEventListener('change', () => save({ look: { [key]: input.checked } }, 0));
@@ -288,6 +293,8 @@ for (const rule of MOUSE_RULES) {
   row.append(input, text);
   mouseRules.append(row);
 }
+const smileBack = $<HTMLInputElement>('smileBack');
+smileBack.addEventListener('change', () => save({ mood: { smileBack: smileBack.checked } }, 0));
 const lookToClose = $<HTMLInputElement>('lookToClose');
 lookToClose.addEventListener('change', () => save({ lookToClose: lookToClose.checked }, 0));
 const lookSeconds = $<HTMLInputElement>('lookToCloseSeconds');
@@ -305,6 +312,7 @@ function renderBehavior(next: Settings): void {
   (blinkSpeed.nextElementSibling as HTMLOutputElement).value = speedText(next.blink.speed);
   mouseRules.querySelectorAll<HTMLInputElement>('input').forEach((i) => (i.checked = i.value === next.mouseRule));
   lookToClose.checked = next.lookToClose;
+  smileBack.checked = next.mood.smileBack;
   if (document.activeElement !== lookSeconds) lookSeconds.value = String(next.lookToCloseSeconds);
   (lookSeconds.nextElementSibling as HTMLOutputElement).value = `${next.lookToCloseSeconds}s`;
   lookSeconds.disabled = !next.lookToClose;
@@ -328,12 +336,12 @@ for (const key of ['awayToBored', 'absentToSleep'] as const) {
   });
 }
 
-// ---- Camera ----
+// ---- Cameras ----
 
-const cameraSelect = $<HTMLSelectElement>('cameraId');
+let knownCameras: CameraInfo[] = [];
 async function loadCameras(askPermission = false): Promise<void> {
   if (askPermission) {
-    // Labels are only visible after the camera was opened once.
+    // Names are only visible after a camera was opened once.
     try {
       const s = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
       s.getTracks().forEach((t) => t.stop());
@@ -341,61 +349,97 @@ async function loadCameras(askPermission = false): Promise<void> {
       setStatus('Camera access was denied.');
     }
   }
-  const cameras = await FaceTracker.listCameras();
-  api.sendCameras(cameras);
-  cameraSelect.replaceChildren(new Option('Built-in camera', 'kind:builtin'), new Option('System default', 'kind:default'));
-  for (const c of cameras) cameraSelect.append(new Option(c.label, c.deviceId));
-  if (settings.cameraId && !cameras.some((c) => c.deviceId === settings.cameraId || c.label === settings.cameraLabel)) {
-    cameraSelect.append(new Option(`${settings.cameraLabel ?? 'Saved camera'} (not connected)`, settings.cameraId));
-  }
-  cameraSelect.value = cameraValue(settings, cameras);
+  knownCameras = await FaceTracker.listCameras();
+  api.sendCameras(knownCameras);
+  renderCameras();
 }
 
-/** The select value for the current camera setting. */
-function cameraValue(s: Settings, cameras: ReadonlyArray<{ deviceId: string; label: string }> = []): string {
-  if (s.cameraId === null && s.cameraLabel === null) return `kind:${s.cameraKind}`;
-  return cameras.find((c) => c.label === s.cameraLabel)?.deviceId ?? s.cameraId ?? `kind:${s.cameraKind}`;
-}
-cameraSelect.addEventListener('change', () => {
-  const value = cameraSelect.value;
-  if (value.startsWith('kind:')) {
-    save({ cameraKind: value.slice(5), cameraId: null, cameraLabel: null }, 0);
-  } else {
-    save({ cameraId: value, cameraLabel: cameraSelect.selectedOptions[0]?.textContent ?? null }, 0);
+function renderCameras(): void {
+  const container = $('cameras');
+  container.replaceChildren();
+  const choice = settings.cameras;
+  const selected = choice.mode === 'selected' ? choice.cameras : [];
+  const row = (type: 'radio' | 'checkbox', label: string, checked: boolean, onChange: (on: boolean) => void, disabled = false, badge = '') => {
+    const el = document.createElement('label');
+    const input = document.createElement('input');
+    input.type = type;
+    input.name = 'camera-mode';
+    input.checked = checked;
+    input.disabled = disabled;
+    input.addEventListener('change', () => onChange(input.checked));
+    const text = document.createElement('span');
+    text.textContent = label;
+    el.append(input, text);
+    if (badge) {
+      const b = document.createElement('span');
+      b.className = 'main-badge';
+      b.textContent = badge;
+      el.append(b);
+    }
+    container.append(el);
+  };
+  row('radio', 'Built-in camera', choice.mode === 'builtin', () => save({ cameras: { mode: 'builtin' } }, 0));
+  row('radio', 'System default', choice.mode === 'default', () => save({ cameras: { mode: 'default' } }, 0));
+  row('radio', `All cameras${knownCameras.length ? ` (${knownCameras.length})` : ''}`, choice.mode === 'all', () =>
+    save({ cameras: { mode: 'all' } }, 0),
+  );
+  for (const cam of knownCameras) {
+    const index = selected.findIndex((c) => findCamera([cam], c) !== null);
+    const on = index >= 0;
+    row(
+      'checkbox',
+      `${cam.label}${isBuiltInCamera(cam.label) ? ' (built-in)' : ''}`,
+      on,
+      (checked) => {
+        const next = checked ? [...selected, { id: cam.deviceId, label: cam.label }] : selected.filter((_, i) => i !== index);
+        save({ cameras: next.length ? { mode: 'selected', cameras: next } : { mode: 'builtin' } }, 0);
+      },
+      false,
+      on && index === 0 && selected.length > 1 ? 'main' : '',
+    );
   }
-  if (testStream) void startCameraTest();
-});
+  for (const saved of selected) {
+    if (!knownCameras.some((c) => findCamera([c], saved))) row('checkbox', `${saved.label || 'Saved camera'} (not connected)`, true, () => {}, true);
+  }
+}
 $('refreshCameras').addEventListener('click', () => void loadCameras(true));
 
-let testStream: MediaStream | null = null;
-const testVideo = $<HTMLVideoElement>('cameraTest');
+let testStreams: MediaStream[] = [];
+const testBox = $('cameraTests');
 async function startCameraTest(): Promise<void> {
   stopCameraTest();
   try {
-    const value = cameraSelect.value;
-    let id: string | null = value.startsWith('kind:') ? null : value;
-    if (value === 'kind:builtin') {
-      id = chooseCamera(await FaceTracker.listCameras(), { cameraId: null, cameraLabel: null, cameraKind: 'builtin' });
+    const ids = chooseCameras(await FaceTracker.listCameras(), settings.cameras);
+    for (const id of ids.length ? ids : [null]) {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: id ? { deviceId: { exact: id } } : true, audio: false });
+      testStreams.push(stream);
+      const figure = document.createElement('figure');
+      const video = document.createElement('video');
+      video.muted = true;
+      video.playsInline = true;
+      video.srcObject = stream;
+      const caption = document.createElement('figcaption');
+      caption.textContent = `${testStreams.length === 1 && ids.length > 1 ? 'Main: ' : ''}${stream.getVideoTracks()[0]?.label ?? 'Camera'}`;
+      figure.append(video, caption);
+      testBox.append(figure);
+      await video.play();
     }
-    testStream = await navigator.mediaDevices.getUserMedia({ video: id ? { deviceId: { exact: id } } : true, audio: false });
-    testVideo.srcObject = testStream;
-    testVideo.hidden = false;
-    await testVideo.play();
+    testBox.hidden = false;
     $('testCamera').textContent = 'Stop test';
     await loadCameras();
   } catch {
-    setStatus('Could not open this camera.');
+    setStatus('Could not open a camera.');
     stopCameraTest();
   }
 }
 function stopCameraTest(): void {
-  testStream?.getTracks().forEach((t) => t.stop());
-  testStream = null;
-  testVideo.srcObject = null;
-  testVideo.hidden = true;
-  $('testCamera').textContent = 'Test camera';
+  testStreams.forEach((s) => s.getTracks().forEach((t) => t.stop()));
+  testStreams = [];
+  testBox.replaceChildren();
+  testBox.hidden = true;
+  $('testCamera').textContent = 'Test cameras';
 }
-$('testCamera').addEventListener('click', () => (testStream ? stopCameraTest() : void startCameraTest()));
+$('testCamera').addEventListener('click', () => (testStreams.length ? stopCameraTest() : void startCameraTest()));
 window.addEventListener('blur', stopCameraTest);
 
 $('calibrate').addEventListener('click', () => {
@@ -476,10 +520,10 @@ function render(next: Settings): void {
     if (document.activeElement !== input) input.value = String(next.mood[key]);
     (input.nextElementSibling as HTMLOutputElement).value = `${next.mood[key]}s`;
   }
-  if (document.activeElement !== cameraSelect) {
-    const value = cameraValue(next);
-    if ([...cameraSelect.options].some((o) => o.value === value)) cameraSelect.value = value;
-  }
+  const camerasChanged = JSON.stringify(next.cameras) !== JSON.stringify(previousCameras);
+  previousCameras = next.cameras;
+  renderCameras();
+  if (camerasChanged && testStreams.length) void startCameraTest();
   renderScreens();
 }
 
