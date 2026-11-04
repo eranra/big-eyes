@@ -5,6 +5,16 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- *Wait while I'm looking* now uses the same eye-contact detection as the eyes and look-to-close. Before, any face
+  turned roughly toward the screen counted, so looking at a phone kept the eyes away.
+- After the eyes were dismissed (for example by look-to-close), camera checks no longer repeat until new input.
+
+### Changed
+
+- *Wait While I'm Looking at the Screen* moved into the **Show After** menu.
+
 ## [0.3.0] - 2026-11-04
 
 ### Added

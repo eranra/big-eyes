@@ -78,6 +78,14 @@ export class IdleMonitor {
     return null;
   }
 
+  /**
+   * True when `update` would show the eyes at this idle time (not showing, armed, idle long enough).
+   * After the eyes were dismissed they are not armed until new input, so this stays false until then.
+   */
+  canShow(idleSeconds: number): boolean {
+    return !this.isShowing && (this.armed || idleSeconds < this.timeout) && idleSeconds >= this.timeout;
+  }
+
   /** Shows now, for example from the menu ("Show eyes now"). */
   forceShow(now: number, idleSeconds: number): IdleEvent | null {
     if (this.isShowing) return null;
