@@ -126,7 +126,7 @@ Click the 👀 icon for quick choices, or open **Settings…** for everything, w
 | **Wait while I'm looking** | Don't appear while someone is looking at the screen, even without keyboard or mouse use | On |
 | **Screen saver** | Pause the eyes during the screen saver, or let the eyes replace the screen saver | Pause |
 | **Blur behind the eyes** | When the eyes replace the screen saver: blur on or off, from the screen saver time on. Or blur always. Strength slider | On, full strength, from the screen saver time |
-| **Screen saver starts after** | Same as the system (your screen saver time, or else the display sleep time), or 5 min … 1 hour | Same as the system |
+| **Screen saver starts after** | Same as the system, or 5 min … 1 hour. "Same as the system" reads the screen saver time once at start and again when it changes: macOS IT policy or System Settings (else display sleep), Windows group policy or screen saver (else monitor off), Linux GNOME or KDE | Same as the system |
 | **Updates** | Check for new versions automatically | On |
 | **Screens** | Built-in screen, main screen, all screens, or the ones you pick | Built-in screen |
 | **Cameras** | Built-in camera, system default, all cameras, or the ones you pick. With several cameras, the first is the main one: the eyes follow what it sees, and the others notice you when it can't | Built-in camera |

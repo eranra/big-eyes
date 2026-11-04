@@ -299,6 +299,15 @@ screenSaverSelect.addEventListener('change', () => save({ screenSaver: screenSav
 const saverMinutes = $<HTMLSelectElement>('screenSaverMinutes');
 for (const p of SCREEN_SAVER_TIME_PRESETS) saverMinutes.append(new Option(p.label, String(p.value)));
 saverMinutes.addEventListener('change', () => save({ screenSaverMinutes: Number(saverMinutes.value) }, 0));
+/** Shows the system's time in the "Same as the System" choice, for example "Same as the System (10 min, IT policy)". */
+function showSaverTime(time: { seconds: number; source: string } | null): void {
+  const option = [...saverMinutes.options].find((o) => o.value === '0');
+  if (!option) return;
+  const source = time?.source === 'managed policy' ? 'IT policy' : time?.source;
+  option.textContent = time ? `Same as the System (${Math.round(time.seconds / 60)} min, ${source})` : 'Same as the System (not set: 10 min)';
+}
+api.onSaverTime(showSaverTime);
+void api.getSaverTime().then(showSaverTime);
 const blurSelect = $<HTMLSelectElement>('blur');
 for (const m of BLUR_MODES) blurSelect.append(new Option(m.label, m.value));
 blurSelect.addEventListener('change', () => save({ blur: blurSelect.value }, 0));

@@ -27,7 +27,8 @@ import { IPC, type CameraInfo, type DisplaySummary, type FacesMessage, type Over
 import { blurActive, screenSaverSeconds, selectDisplays, type GazeReference, type Settings } from '../core/settings';
 import { buildMenuModel, type MenuAction, type MenuNode } from './menu-model';
 import { SettingsStore } from './store';
-import { displaySleepPrevented, screenSaverRunning, setLinuxAutostart, systemScreenSaverSeconds } from './system';
+import { displaySleepPrevented, macSaverFiles, screenSaverRunning, setLinuxAutostart, systemScreenSaverTime } from './system';
+import * as fsWatch from 'node:fs';
 import { Updater, updateMenuLabel, type UpdateState } from './updater';
 import { log as writeLog, logFile } from './logger';
 import { ISSUES_URL, RELEASES_URL, REPO_URL } from '../core/update';
@@ -69,7 +70,11 @@ protocol.registerSchemesAsPrivileged([
 
 /** Testing aid: keep settings in another folder, for example to try the defaults. */
 const USER_DATA_DIR = process.argv.find((a) => a.startsWith('--settings-dir='))?.slice('--settings-dir='.length);
-if (USER_DATA_DIR) app.setPath('userData', path.resolve(USER_DATA_DIR));
+if (USER_DATA_DIR) {
+  app.setPath('userData', path.resolve(USER_DATA_DIR));
+  // Test copies keep their own log, so they never mix with the real app's log.
+  app.setAppLogsPath(path.join(path.resolve(USER_DATA_DIR), 'logs'));
+}
 // Snapshots for the docs always use default settings, never the user's own file.
 if (SNAPSHOT_DIR && !USER_DATA_DIR) {
   app.setPath('userData', path.join(os.tmpdir(), `big-eyes-snapshot-${process.pid}`));
@@ -364,6 +369,45 @@ function applyScreenSaverMode(s: Settings): void {
 }
 
 let lastIdleSeconds = 0;
+let saverTimeSource: string | null = null;
+let saverReadTimer: NodeJS.Timeout | null = null;
+
+/** Reads the system screen saver time. Called at start and when it may have changed (no timer). */
+async function readSaverTime(reason: string): Promise<void> {
+  const time = await systemScreenSaverTime();
+  const seconds = time?.seconds ?? null;
+  if (seconds !== systemSaverSeconds || (time?.source ?? null) !== saverTimeSource) {
+    eventLog(`system screen saver time: ${time ? `${Math.round(time.seconds / 60)} min (${time.source})` : 'none'} [read at ${reason}]`);
+  }
+  systemSaverSeconds = seconds;
+  saverTimeSource = time?.source ?? null;
+  settingsWindow?.webContents.send(IPC.saverTime, time);
+}
+
+/** Reads again shortly after a change, so several file events cause one read. */
+function scheduleSaverRead(reason: string): void {
+  if (saverReadTimer) clearTimeout(saverReadTimer);
+  saverReadTimer = setTimeout(() => void readSaverTime(reason), 1500);
+}
+
+/**
+ * Watches the places that hold the screen saver time, so a change in System Settings (or a new IT policy) is
+ * picked up without polling. macOS: the managed preferences and ByHost folders. Windows and Linux have no simple
+ * file to watch; there the time is read again on unlock and wake.
+ */
+function watchSaverSettings(): void {
+  if (process.platform !== 'darwin') return;
+  const folders = new Set(macSaverFiles().map((f) => (f.endsWith('.plist') ? path.dirname(f) : f)));
+  for (const folder of folders) {
+    try {
+      fsWatch.watch(folder, { persistent: false }, (_event, name) => {
+        if (!name || /screensaver/i.test(String(name))) scheduleSaverRead('settings change');
+      });
+    } catch {
+      // The folder may not exist (no IT policy). Unlock and wake still read the time again.
+    }
+  }
+}
 
 /** Turns the blur behind the eyes on or off, from the settings and how long the computer has been idle. */
 function updateBlur(idleSeconds: number): void {
@@ -733,6 +777,9 @@ function registerIpc(): void {
     overlay.eyeArea = { x: bounds.x + (r.x as number), y: bounds.y + (r.y as number), width: r.width as number, height: r.height as number };
   });
   ipcMain.handle(IPC.getAbout, () => aboutInfo());
+  ipcMain.handle(IPC.getSaverTime, () =>
+    systemSaverSeconds ? { seconds: systemSaverSeconds, source: saverTimeSource ?? 'system' } : null,
+  );
   ipcMain.on(IPC.checkUpdates, () => void updater?.check(true));
   ipcMain.on(IPC.openLink, (_e, url: unknown) => openLink(url));
   ipcMain.on(IPC.presenceFaces, (event, message: { faces?: unknown; error?: unknown }) => {
@@ -871,13 +918,8 @@ void app.whenReady().then(async () => {
     copyright: '© 2026 Eran Raichstein and contributors. Apache-2.0 License.',
     website: REPO_URL,
   });
-  const readSaverTime = async (): Promise<void> => {
-    const seconds = await systemScreenSaverSeconds();
-    if (seconds !== systemSaverSeconds) eventLog(`system screen saver / display sleep time: ${seconds ? `${Math.round(seconds / 60)} min` : 'none'}`);
-    systemSaverSeconds = seconds;
-  };
-  void readSaverTime();
-  setInterval(() => void readSaverTime(), 10 * 60 * 1000);
+  void readSaverTime('start');
+  watchSaverSettings();
   rebuildOverlays();
   updateTray();
   applyScreenSaverMode(store.get());
@@ -893,12 +935,16 @@ void app.whenReady().then(async () => {
   powerMonitor.on('unlock-screen', () => {
     eventLog('screen unlocked');
     screenLocked = false;
+    scheduleSaverRead('unlock');
   });
   powerMonitor.on('suspend', () => {
     eventLog('system sleep');
     hide();
   });
-  powerMonitor.on('resume', () => eventLog('system wake'));
+  powerMonitor.on('resume', () => {
+    eventLog('system wake');
+    scheduleSaverRead('wake');
+  });
 
   setInterval(() => void checkIdle(), 100);
   if (SHOW_AT_START) setTimeout(show, 1200);

@@ -37,6 +37,10 @@ export const IPC = {
   presenceFaces: 'big-eyes:presence-faces',
   /** overlay -> main: the eyes finished look-to-close; hide them. */
   requestClose: 'big-eyes:request-close',
+  /** settings window -> main (invoke): the system screen saver time and where it came from. */
+  getSaverTime: 'big-eyes:get-saver-time',
+  /** main -> settings window: the system screen saver time changed. */
+  saverTime: 'big-eyes:saver-time',
   /** main -> overlay: the blur behind the eyes turns on (true) or off (false). */
   blur: 'big-eyes:blur',
   /** renderer -> main: one line for the log file. */
@@ -108,6 +112,8 @@ export interface BigEyesApi {
   onVisibility(listener: (visible: boolean) => void): void;
   onCalibrate(listener: () => void): void;
   onBlur(listener: (on: boolean) => void): void;
+  getSaverTime(): Promise<{ seconds: number; source: string } | null>;
+  onSaverTime(listener: (time: { seconds: number; source: string } | null) => void): void;
   onFaces(listener: (message: FacesMessage) => void): void;
   onPresenceCheck(listener: (active: boolean) => void): void;
   sendPresenceFaces(message: { faces: FacesMessage['faces']; error?: string }): void;

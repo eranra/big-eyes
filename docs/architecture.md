@@ -80,8 +80,15 @@ counts. So looking at a phone, a book or another screen does not hold the eyes b
 - `replace`: `powerSaveBlocker.start('prevent-display-sleep')` keeps the screen saver and display sleep away while
   Big Eyes runs. The "don't show during video" check ignores this blocker, because it is our own.
 - Blur in `replace` mode starts when the idle time reaches the screen saver time (`screenSaverSeconds()`): the
-  user's own time, else the system screen saver time (`defaults -currentHost read com.apple.screensaver idleTime`),
-  else the display sleep time (`pmset -g displaysleep`), else 10 minutes. The main process decides it on every idle
+  user's own time, else the system time from `systemScreenSaverTime()` (`src/main/system.ts`), else 10 minutes.
+
+  | System | Sources, first found wins |
+  |---|---|
+  | macOS | `/Library/Managed Preferences/<user>/com.apple.screensaver.plist` and `/Library/Managed Preferences/com.apple.screensaver.plist` (`idleTime`, set by IT profiles), `defaults -currentHost read com.apple.screensaver idleTime`, `pmset -g` displaysleep |
+  | Windows | `HKCU\Software\Policies\Microsoft\Windows\Control Panel\Desktop`, `HKCU\Control Panel\Desktop` (`ScreenSaveActive`, `ScreenSaveTimeOut`), `powercfg /q` monitor-off |
+  | Linux | `gsettings get org.gnome.desktop.session idle-delay`, `~/.config/kscreenlockerrc` `Timeout` |
+
+  It is read at start, and again on screen unlock, wake, and (macOS) file changes in those folders. There is no timer. The main process decides it on every idle
   tick and switches the window blur (macOS vibrancy, Windows acrylic) and the page tint.
 
 ## Updates
