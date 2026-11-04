@@ -5,6 +5,8 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-11-04
+
 ### Added
 
 - **Blur behind the eyes**: when the eyes replace the screen saver, the normal eyes appear as usual, and once the
