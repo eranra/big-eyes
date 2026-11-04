@@ -24,11 +24,12 @@ import { PresenceCheck } from '../core/presence';
 import { ActivityClock } from '../core/activity';
 import type { FaceObservation } from '../core/face';
 import { IPC, type CameraInfo, type DisplaySummary, type FacesMessage, type OverlayRole } from '../core/ipc';
-import { selectDisplays, type GazeReference, type Settings } from '../core/settings';
+import { blurActive, selectDisplays, type GazeReference, type Settings } from '../core/settings';
 import { buildMenuModel, type MenuAction, type MenuNode } from './menu-model';
 import { SettingsStore } from './store';
 import { displaySleepPrevented, screenSaverRunning, setLinuxAutostart } from './system';
 import { Updater, updateMenuLabel, type UpdateState } from './updater';
+import { log as writeLog, logFile } from './logger';
 import { ISSUES_URL, RELEASES_URL, REPO_URL } from '../core/update';
 import type { AboutInfo } from '../core/ipc';
 
@@ -45,6 +46,11 @@ const GUIDED_TEST = args.has('--guided-test');
 const CAMERA_NAME = process.argv.find((a) => a.startsWith('--camera-name='))?.slice('--camera-name='.length);
 const debugLog = (...items: unknown[]): void => {
   if (FORCE_DEBUG) console.log(`[main ${(performance.now() / 1000).toFixed(1)}s]`, ...items);
+};
+/** Important events: always written to the log file, and to the terminal in debug mode. */
+const eventLog = (...items: unknown[]): void => {
+  writeLog(...items);
+  debugLog(...items);
 };
 const snapshotIndex = process.argv.indexOf('--snapshot');
 const SNAPSHOT_DIR = snapshotIndex > 0 ? process.argv[snapshotIndex + 1] : undefined;
@@ -102,6 +108,9 @@ let screenSaverBlocker: number | null = null;
 let screenSaverActive = false;
 let lastScreenSaverCheck = 0;
 let lastActivityLog = 0;
+let lastBlockLog = 0;
+let presenceStartedAt = 0;
+let presenceFrames = 0;
 let lastCursor = { x: 0, y: 0 };
 
 const nowSeconds = (): number => performance.now() / 1000;
@@ -215,6 +224,20 @@ function forwardConsole(window: BrowserWindow, name: string): void {
   window.webContents.on('render-process-gone', (_e, details) => console.error(`[${name}] renderer gone: ${details.reason}`));
 }
 
+/**
+ * Turns the system blur behind an overlay window on or off.
+ * macOS: the "fullscreen UI" material (the strong blur behind full-screen system panels).
+ * Windows 11: acrylic. Linux: no system blur; the page draws a strong tint instead.
+ */
+function applyBlur(window: BrowserWindow, on: boolean): void {
+  try {
+    if (process.platform === 'darwin') window.setVibrancy(on ? 'fullscreen-ui' : null);
+    else if (process.platform === 'win32') window.setBackgroundMaterial(on ? 'acrylic' : 'none');
+  } catch (error) {
+    writeLog('blur not available:', String(error));
+  }
+}
+
 function createOverlay(display: Display, isTracker: boolean): Overlay {
   const role: OverlayRole = { displayId: display.id, isTracker, ...(GUIDED_TEST && { guidedTest: true }) };
   const { x, y, width, height } = display.bounds;
@@ -229,6 +252,8 @@ function createOverlay(display: Display, isTracker: boolean): Overlay {
     backgroundColor: '#00000000',
     hasShadow: false,
     resizable: false,
+    // The system blur stays on even though the overlay never has focus.
+    ...(process.platform === 'darwin' && { visualEffectState: 'active' as const }),
     movable: false,
     minimizable: false,
     maximizable: false,
@@ -243,6 +268,7 @@ function createOverlay(display: Display, isTracker: boolean): Overlay {
   window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
   // Clicks go through to the apps below. Any click or key press resets the idle time, which hides the eyes.
   window.setIgnoreMouseEvents(true);
+  applyBlur(window, blurActive(store.get()));
   window.setBounds(display.bounds);
   if (FORCE_DEBUG) forwardConsole(window, `overlay ${display.id}`);
   void window.loadURL('app://bundle/overlay.html');
@@ -321,11 +347,11 @@ function applyScreenSaverMode(s: Settings): void {
   const want = s.screenSaver === 'replace' && !s.paused;
   if (want && screenSaverBlocker === null) {
     screenSaverBlocker = powerSaveBlocker.start('prevent-display-sleep');
-    debugLog('screen saver: blocked (eyes replace it)');
+    eventLog('screen saver: blocked (eyes replace it)');
   } else if (!want && screenSaverBlocker !== null) {
     powerSaveBlocker.stop(screenSaverBlocker);
     screenSaverBlocker = null;
-    debugLog('screen saver: allowed');
+    eventLog('screen saver: allowed');
   }
 }
 
@@ -361,21 +387,37 @@ async function checkIdle(): Promise<void> {
     if (s.screenSaver === 'pause' && idleSeconds >= Math.min(idle.timeout, 5) && now - lastScreenSaverCheck >= 1) {
       lastScreenSaverCheck = now;
       const running = await screenSaverRunning();
-      if (running !== screenSaverActive) debugLog(`screen saver ${running ? 'started' : 'stopped'}`);
+      if (running !== screenSaverActive) eventLog(`screen saver ${running ? 'started' : 'stopped'}`);
       screenSaverActive = running;
     } else if (s.screenSaver !== 'pause' || idleSeconds < 1) {
       screenSaverActive = false;
     }
     let blocked = s.paused || screenLocked || overlays.length === 0 || screenSaverActive;
+    const reasons: string[] = [];
+    if (s.paused) reasons.push('paused');
+    if (screenLocked) reasons.push('screen locked');
+    if (overlays.length === 0) reasons.push('no screen selected');
+    if (screenSaverActive) reasons.push('screen saver running');
     // `canShow` is false after the eyes were dismissed (key, mouse onto the eyes, or look-to-close) until new
     // input, so no camera check runs in that time.
     const due = !blocked && idle.canShow(idleSeconds);
     // Asking for video playback is slower, so do it only right before showing.
-    if (due && s.respectVideoPlayback) blocked = await displaySleepPrevented(ownPids());
+    if (due && s.respectVideoPlayback && (await displaySleepPrevented(ownPids()))) {
+      blocked = true;
+      reasons.push('an app keeps the display awake (video)');
+    }
+    if (idleSeconds >= idle.timeout && !idle.isShowing && reasons.length && now - lastBlockLog >= 60) {
+      lastBlockLog = now;
+      eventLog(`eyes held back: ${reasons.join(', ')} (idle=${Math.round(idleSeconds)}s)`);
+    }
+    if (idleSeconds >= idle.timeout && !idle.isShowing && !reasons.length && !idle.canShow(idleSeconds) && now - lastBlockLog >= 300) {
+      lastBlockLog = now;
+      eventLog(`eyes held back: dismissed earlier, waiting for keyboard or mouse (idle=${Math.round(idleSeconds)}s)`);
+    }
 
     // "Wait while someone looks at the screen": before showing, take a short look with the camera.
     if (!due && presence.phase === 'checking' && !idle.isShowing) {
-      debugLog('presence: check stopped (the eyes cannot show now)');
+      eventLog('presence: check stopped (the eyes cannot show now)');
       presence.reset();
       setPresenceCamera(false);
     }
@@ -391,13 +433,15 @@ async function checkIdle(): Promise<void> {
         if (result === 'watched') {
           // Close the camera only when the eyes wait. When they show, the overlay keeps using it.
           setPresenceCamera(false);
-          debugLog('presence: someone is looking at the screen, the eyes wait');
+          eventLog(`presence: someone is looking at the screen, the eyes wait (${presenceFrames} frames, ${(now - presenceStartedAt).toFixed(1)}s)`);
           return;
         }
-        debugLog('presence: nobody looking, showing the eyes');
+        eventLog(`presence: nobody looking, showing the eyes (${presenceFrames} frames, ${(now - presenceStartedAt).toFixed(1)}s${presenceFrames === 0 ? ', the camera sent no frames' : ''})`);
       } else if (presence.due(now)) {
-        debugLog('presence: checking with the camera');
+        eventLog('presence: checking with the camera');
         presence.start(now, s.attention, s.mirrorCamera);
+        presenceStartedAt = now;
+        presenceFrames = 0;
         setPresenceCamera(true);
         return;
       } else {
@@ -407,7 +451,7 @@ async function checkIdle(): Promise<void> {
 
     if (STAY && idle.isShowing) return;
     const event = idle.update({ idleSeconds, now, blocked, pointerMoved, pointerInEyes, mouseRule: s.mouseRule });
-    if (event) debugLog(`idle event: ${event}${event === 'hide' ? ` (${idle.lastHideReason})` : ''} idle=${idleSeconds.toFixed(1)}s system=${systemIdle}s`);
+    if (event) eventLog(`idle event: ${event}${event === 'hide' ? ` (${idle.lastHideReason})` : ''} idle=${idleSeconds.toFixed(1)}s system=${systemIdle}s`);
     if (event === 'show') showOverlays();
     if (event === 'hide') {
       presence.reset();
@@ -602,6 +646,7 @@ function openSettingsWindow(): void {
 
 function setStatus(message: string): void {
   console.warn('[big-eyes]', message);
+  writeLog('status:', message);
   tray?.setToolTip(`Big Eyes — ${message}`);
   settingsWindow?.webContents.send(IPC.status, message);
 }
@@ -625,6 +670,9 @@ function onSettingsChanged(previous: Settings, next: Settings): void {
   settingsWindow?.webContents.send(IPC.settings, next);
   if (previous.openAtLogin !== next.openAtLogin) void applyLoginItem(next.openAtLogin);
   applyScreenSaverMode(next);
+  if (blurActive(previous) !== blurActive(next)) {
+    for (const o of overlays) if (!o.window.isDestroyed()) applyBlur(o.window, blurActive(next));
+  }
   if (!next.waitWhileWatched && presence.phase !== 'idle') {
     presence.reset();
     setPresenceCamera(false);
@@ -665,16 +713,19 @@ function registerIpc(): void {
     if (!sender?.role.isTracker || presence.phase !== 'checking') return;
     if (typeof message?.error === 'string') {
       // A camera problem must never keep the eyes away.
-      debugLog('presence: camera error, ignoring the check:', message.error);
+      eventLog('presence: camera error, ignoring the check:', message.error);
       presence.fail();
       setPresenceCamera(false);
       return;
     }
-    if (Array.isArray(message?.faces)) presence.report(message.faces as FaceObservation[], nowSeconds());
+    if (Array.isArray(message?.faces)) {
+      presenceFrames++;
+      presence.report(message.faces as FaceObservation[], nowSeconds());
+    }
   });
   ipcMain.on(IPC.requestClose, (event) => {
     if (!overlays.some((o) => o.window.webContents === event.sender)) return;
-    debugLog('look-to-close: hiding the eyes');
+    eventLog('look-to-close: hiding the eyes');
     hide();
   });
   ipcMain.on(IPC.cameras, (_e, list: unknown) => {
@@ -688,6 +739,9 @@ function registerIpc(): void {
     const sender = overlays.find((o) => o.window.webContents === event.sender);
     if (!sender?.role.isTracker) return;
     store.update({ attention: { reference } });
+  });
+  ipcMain.on(IPC.log, (_e, message: unknown) => {
+    if (typeof message === 'string') eventLog(message.slice(0, 300));
   });
   ipcMain.on(IPC.status, (_e, message: unknown) => {
     if (typeof message === 'string') setStatus(message.slice(0, 300));
@@ -772,6 +826,7 @@ void app.whenReady().then(async () => {
   tray.on('click', () => {
     if (process.platform !== 'darwin') tray?.popUpContextMenu();
   });
+  eventLog(`Big Eyes ${app.getVersion()} started (${process.platform} ${process.arch}); log: ${logFile()}`);
   updater = new Updater({
     autoCheckEnabled: () => store.get().checkForUpdates,
     lastAnnounced: () => store.get().lastAnnouncedVersion,
@@ -797,13 +852,19 @@ void app.whenReady().then(async () => {
   screen.on('display-removed', rebuildOverlays);
   screen.on('display-metrics-changed', rebuildOverlays);
   powerMonitor.on('lock-screen', () => {
+    eventLog('screen locked');
     screenLocked = true;
     hide();
   });
   powerMonitor.on('unlock-screen', () => {
+    eventLog('screen unlocked');
     screenLocked = false;
   });
-  powerMonitor.on('suspend', hide);
+  powerMonitor.on('suspend', () => {
+    eventLog('system sleep');
+    hide();
+  });
+  powerMonitor.on('resume', () => eventLog('system wake'));
 
   setInterval(() => void checkIdle(), 100);
   if (SHOW_AT_START) setTimeout(show, 1200);

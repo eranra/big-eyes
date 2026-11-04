@@ -3,7 +3,7 @@ import { chooseCameras, findCamera, isBuiltInCamera } from '../core/camera';
 import type { CameraInfo } from '../core/ipc';
 import type { BigEyesApi, DisplaySummary } from '../core/ipc';
 import type { Mood } from '../core/mood';
-import { defaultSettings, EYE_SHAPES, IRIS_PRESETS, MOUSE_RULES, POSITIONS, PUPIL_SHAPES, SCREEN_SAVER_MODES, IRIS_STYLES, matchingTheme, THEMES, type LookSettings, type Settings } from '../core/settings';
+import { defaultSettings, EYE_SHAPES, IRIS_PRESETS, MOUSE_RULES, POSITIONS, PUPIL_SHAPES, SCREEN_SAVER_MODES, BLUR_MODES, IRIS_STYLES, matchingTheme, THEMES, type LookSettings, type Settings } from '../core/settings';
 import { drawEyes } from './draw';
 import { FaceTracker } from './tracker';
 
@@ -296,6 +296,14 @@ for (const rule of MOUSE_RULES) {
 const screenSaverSelect = $<HTMLSelectElement>('screenSaver');
 for (const m of SCREEN_SAVER_MODES) screenSaverSelect.append(new Option(m.label, m.value));
 screenSaverSelect.addEventListener('change', () => save({ screenSaver: screenSaverSelect.value }, 0));
+const blurSelect = $<HTMLSelectElement>('blur');
+for (const m of BLUR_MODES) blurSelect.append(new Option(m.label, m.value));
+blurSelect.addEventListener('change', () => save({ blur: blurSelect.value }, 0));
+const blurStrength = $<HTMLInputElement>('blurStrength');
+blurStrength.addEventListener('input', () => {
+  (blurStrength.nextElementSibling as HTMLOutputElement).value = `${Math.round(Number(blurStrength.value) * 100)}%`;
+  save({ blurStrength: Number(blurStrength.value) });
+});
 const smileBack = $<HTMLInputElement>('smileBack');
 smileBack.addEventListener('change', () => save({ mood: { smileBack: smileBack.checked } }, 0));
 const lookToClose = $<HTMLInputElement>('lookToClose');
@@ -317,6 +325,10 @@ function renderBehavior(next: Settings): void {
   lookToClose.checked = next.lookToClose;
   smileBack.checked = next.mood.smileBack;
   screenSaverSelect.value = next.screenSaver;
+  blurSelect.value = next.blur;
+  if (document.activeElement !== blurStrength) blurStrength.value = String(next.blurStrength);
+  (blurStrength.nextElementSibling as HTMLOutputElement).value = `${Math.round(next.blurStrength * 100)}%`;
+  blurStrength.disabled = next.blur === 'off';
   if (document.activeElement !== lookSeconds) lookSeconds.value = String(next.lookToCloseSeconds);
   (lookSeconds.nextElementSibling as HTMLOutputElement).value = `${next.lookToCloseSeconds}s`;
   lookSeconds.disabled = !next.lookToClose;

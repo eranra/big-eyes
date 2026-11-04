@@ -29,6 +29,7 @@ const api: BigEyesApi = {
   sendCameras: (cameras) => ipcRenderer.send(IPC.cameras, cameras),
   sendCalibrated: (reference) => ipcRenderer.send(IPC.calibrated, reference),
   sendStatus: (message) => ipcRenderer.send(IPC.status, message),
+  sendLog: (message) => ipcRenderer.send(IPC.log, message),
   sendEyeArea: (rect) => ipcRenderer.send(IPC.eyeArea, rect),
   requestClose: () => ipcRenderer.send(IPC.requestClose),
   preview: () => ipcRenderer.send(IPC.preview),

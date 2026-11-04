@@ -123,6 +123,7 @@ Click the 👀 icon for quick choices, or open **Settings…** for everything, w
 | **Show after** | 15 seconds … 10 minutes, or any time | 30 seconds |
 | **Wait while I'm looking** | Don't appear while someone is looking at the screen, even without keyboard or mouse use | On |
 | **Screen saver** | Pause the eyes during the screen saver, or let the eyes replace the screen saver | Pause |
+| **Blur behind the eyes** | Off, when replacing the screen saver, or always; strength | When replacing the screen saver |
 | **Updates** | Check for new versions automatically | On |
 | **Screens** | Built-in screen, main screen, all screens, or the ones you pick | Built-in screen |
 | **Cameras** | Built-in camera, system default, all cameras, or the ones you pick. With several cameras, the first is the main one: the eyes follow what it sees, and the others notice you when it can't | Built-in camera |
@@ -164,7 +165,9 @@ Details: [docs/privacy.md](docs/privacy.md).
 | Wrong camera or screen | Menu → **Cameras** / **Screens** |
 | The eyes don't smile back | Smile clearly while looking at them. Check **Smile Back When You Smile** in the menu |
 
-More help: [docs/troubleshooting.md](docs/troubleshooting.md).
+More help: [docs/troubleshooting.md](docs/troubleshooting.md). The app keeps a log of what it did and why
+(macOS: `~/Library/Logs/Big Eyes/main.log`, Windows: `%APPDATA%\Big Eyes\logs\main.log`,
+Linux: `~/.config/Big Eyes/logs/main.log`); please add it to bug reports.
 
 ## 🛠️ Build from source
 

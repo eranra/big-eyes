@@ -88,6 +88,14 @@ export type MouseRule = 'onto-eyes' | 'any' | 'never';
  */
 export type ScreenSaverMode = 'pause' | 'replace';
 
+/**
+ * Blur the screen behind the eyes.
+ * - 'off': no blur (the background dim setting still applies).
+ * - 'screensaver': blur only when the eyes replace the screen saver (default).
+ * - 'always': blur every time the eyes appear.
+ */
+export type BlurMode = 'off' | 'screensaver' | 'always';
+
 export interface BlinkSettings {
   /** How often the eyes blink: 0 = never, 1 = normal (every 2-5 s), 3 = very often. */
   rate: number;
@@ -107,6 +115,10 @@ export interface Settings {
   waitWhileWatched: boolean;
   /** What happens with the system screen saver. */
   screenSaver: ScreenSaverMode;
+  /** Blur the screen behind the eyes. */
+  blur: BlurMode;
+  /** Blur strength, 0.3 (light) .. 1 (strong: nothing readable behind). */
+  blurStrength: number;
   /** What mouse movement does while the eyes are shown. */
   mouseRule: MouseRule;
   /** Close the eyes when the person keeps looking into them for `lookToCloseSeconds`. */
@@ -354,6 +366,17 @@ export const SCREEN_SAVER_MODES: ReadonlyArray<{ label: string; value: ScreenSav
   { label: 'Eyes replace the screen saver', value: 'replace' },
 ];
 
+export const BLUR_MODES: ReadonlyArray<{ label: string; value: BlurMode }> = [
+  { label: 'Off', value: 'off' },
+  { label: 'When Replacing the Screen Saver', value: 'screensaver' },
+  { label: 'Always', value: 'always' },
+];
+
+/** Whether the screen behind the eyes is blurred now. */
+export function blurActive(s: Pick<Settings, 'blur' | 'screenSaver'>): boolean {
+  return s.blur === 'always' || (s.blur === 'screensaver' && s.screenSaver === 'replace');
+}
+
 export const BLINK_RATE_PRESETS: ReadonlyArray<{ label: string; value: number }> = [
   { label: 'Never', value: 0 },
   { label: 'Rarely', value: 0.4 },
@@ -406,6 +429,8 @@ export function defaultSettings(): Settings {
     position: 'center',
     waitWhileWatched: true,
     screenSaver: 'pause',
+    blur: 'screensaver',
+    blurStrength: 0.85,
     mouseRule: 'onto-eyes',
     lookToClose: false,
     lookToCloseSeconds: 2,
@@ -564,6 +589,8 @@ export function normalizeSettings(input: unknown): Settings {
     idleTimeout: num(s.idleTimeout, d.idleTimeout, 5, 24 * 3600),
     waitWhileWatched: bool(s.waitWhileWatched, d.waitWhileWatched),
     screenSaver: oneOf(s.screenSaver, ['pause', 'replace'] as const, d.screenSaver),
+    blur: oneOf(s.blur, ['off', 'screensaver', 'always'] as const, d.blur),
+    blurStrength: num(s.blurStrength, d.blurStrength, 0.3, 1),
     position: oneOf(s.position, ['center', 'top-left', 'top-right', 'bottom-left', 'bottom-right'] as const, d.position),
     mouseRule: oneOf(s.mouseRule, ['onto-eyes', 'any', 'never'] as const, d.mouseRule),
     lookToClose: bool(s.lookToClose, d.lookToClose),
