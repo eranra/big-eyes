@@ -90,6 +90,8 @@ counts. So looking at a phone, a book or another screen does not hold the eyes b
 
   It is read at start, and again on screen unlock, wake, and (macOS) file changes in those folders. There is no timer. The main process decides it on every idle
   tick and switches the window blur (macOS vibrancy, Windows acrylic) and the page tint.
+- Screens without eyes get a blur-only window (`blur.html`, created with the overlays in `rebuildOverlays()`).
+  It is hidden until the blur turns on, so the blur covers every screen while the eyes stay on the chosen ones.
 
 ## Updates
 

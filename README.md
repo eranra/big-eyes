@@ -100,8 +100,8 @@ springy movement, expressive eyebrows, and wet-looking highlights.
   your phone doesn't count. (You can turn this off in **Show After**.)
 - They don't take keyboard focus and don't appear while your screen is locked.
 - By default they stay away while the **screen saver** runs. Or choose *Eyes replace the screen saver*: the eyes
-  appear as usual, and when the screen saver would start, the screen behind them becomes **strongly blurred**
-  (you can turn the blur off).
+  appear as usual, and when the screen saver would start, the screen behind them becomes **strongly blurred** —
+  on **every** screen, also the ones without eyes (you can turn the blur off).
 - On macOS they also wait while a video or presentation is playing.
 
 ![Look into the eyes to close them](docs/images/goodbye.png)

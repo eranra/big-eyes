@@ -36,7 +36,7 @@ await Promise.all([
   }),
   build({
     ...common,
-    entryPoints: ['overlay', 'settings', 'snapshot', 'about'].map((n) => join(root, `src/renderer/${n}.ts`)),
+    entryPoints: ['overlay', 'settings', 'snapshot', 'about', 'blur'].map((n) => join(root, `src/renderer/${n}.ts`)),
     outdir: join(out, 'renderer'),
     platform: 'browser',
     format: 'iife',
@@ -45,7 +45,7 @@ await Promise.all([
 ]);
 
 const renderer = join(out, 'renderer');
-for (const file of ['overlay.html', 'settings.html', 'settings.css', 'snapshot.html', 'about.html']) {
+for (const file of ['overlay.html', 'settings.html', 'settings.css', 'snapshot.html', 'about.html', 'blur.html']) {
   await cp(join(root, 'src/renderer', file), join(renderer, file));
 }
 await cp(join(root, 'node_modules/@mediapipe/tasks-vision/wasm'), join(renderer, 'wasm'), { recursive: true });

@@ -24,7 +24,7 @@ import { PresenceCheck } from '../core/presence';
 import { ActivityClock } from '../core/activity';
 import type { FaceObservation } from '../core/face';
 import { IPC, type CameraInfo, type DisplaySummary, type FacesMessage, type OverlayRole } from '../core/ipc';
-import { blurActive, screenSaverSeconds, selectDisplays, type GazeReference, type Settings } from '../core/settings';
+import { blurActive, blurOnlyDisplays, screenSaverSeconds, selectDisplays, type GazeReference, type Settings } from '../core/settings';
 import { buildMenuModel, type MenuAction, type MenuNode } from './menu-model';
 import { SettingsStore } from './store';
 import { displaySleepPrevented, macSaverFiles, screenSaverRunning, setLinuxAutostart, systemScreenSaverTime } from './system';
@@ -96,6 +96,8 @@ interface Overlay {
   eyeArea: { x: number; y: number; width: number; height: number } | null;
 }
 let overlays: Overlay[] = [];
+/** Blur-only windows on the screens that do not show the eyes. Visible only while the blur is on. */
+let blurWindows: BrowserWindow[] = [];
 /** Extra space around the eyes (pixels) that also counts as "inside". */
 const EYE_AREA_MARGIN = 24;
 let settingsWindow: BrowserWindow | null = null;
@@ -288,6 +290,39 @@ function createOverlay(display: Display, isTracker: boolean): Overlay {
   return { window, role, eyeArea: null };
 }
 
+/** A blur-only window for a screen without eyes: same window kind as an overlay, but no eyes and no camera. */
+function createBlurWindow(display: Display): BrowserWindow {
+  const { x, y, width, height } = display.bounds;
+  const window = new BrowserWindow({
+    x,
+    y,
+    width,
+    height,
+    show: false,
+    frame: false,
+    transparent: true,
+    backgroundColor: '#00000000',
+    hasShadow: false,
+    resizable: false,
+    movable: false,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    skipTaskbar: true,
+    focusable: false,
+    alwaysOnTop: true,
+    enableLargerThanScreen: true,
+    ...(process.platform === 'darwin' && { visualEffectState: 'active' as const }),
+    webPreferences: webPreferences(null),
+  });
+  window.setAlwaysOnTop(true, 'screen-saver');
+  window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
+  window.setIgnoreMouseEvents(true);
+  window.setBounds(display.bounds);
+  void window.loadURL('app://bundle/blur.html');
+  return window;
+}
+
 /** Creates one overlay window per selected display. Keeps them hidden until needed. */
 function rebuildOverlays(): void {
   for (const o of overlays) if (!o.window.isDestroyed()) o.window.destroy();
@@ -297,6 +332,10 @@ function rebuildOverlays(): void {
   const primaryId = screen.getPrimaryDisplay().id;
   const trackerId = (chosen.find((d) => d.id === primaryId) ?? chosen[0])?.id;
   overlays = chosen.map((d) => createOverlay(d, d.id === trackerId));
+  // Every other screen gets a blur-only window, so the blur covers all screens.
+  for (const w of blurWindows) if (!w.isDestroyed()) w.destroy();
+  blurWindows = blurOnlyDisplays(screen.getAllDisplays(), chosen).map(createBlurWindow);
+  blurOn = false;
   if (idle.isShowing) showOverlays();
 }
 
@@ -422,6 +461,23 @@ function updateBlur(idleSeconds: number): void {
     if (o.window.isDestroyed()) continue;
     applyBlur(o.window, want);
     o.window.webContents.send(IPC.blur, want);
+  }
+  for (const w of blurWindows) {
+    if (w.isDestroyed()) continue;
+    if (want) {
+      applyBlur(w, true);
+      w.showInactive();
+      w.setAlwaysOnTop(true, 'screen-saver');
+      w.webContents.send(IPC.blur, true);
+    } else {
+      w.webContents.send(IPC.blur, false);
+      // Let the tint fade out, then remove the system blur and hide the window.
+      setTimeout(() => {
+        if (blurOn || w.isDestroyed()) return;
+        applyBlur(w, false);
+        w.hide();
+      }, 1300);
+    }
   }
 }
 
@@ -740,6 +796,7 @@ function onSettingsChanged(previous: Settings, next: Settings): void {
   if (displaysChanged) rebuildOverlays();
   const s = effectiveSettings();
   for (const { window } of overlays) if (!window.isDestroyed()) window.webContents.send(IPC.settings, s);
+  for (const w of blurWindows) if (!w.isDestroyed()) w.webContents.send(IPC.settings, s);
   settingsWindow?.webContents.send(IPC.settings, next);
   if (previous.openAtLogin !== next.openAtLogin) void applyLoginItem(next.openAtLogin);
   applyScreenSaverMode(next);
