@@ -23,7 +23,7 @@ describe('tray menu model', () => {
   it('marks the current presets', () => {
     const menu = buildMenuModel(defaultSettings(), cameras, displays, 'darwin');
     expect(checked(find(menu, 'Eye Size'))).toEqual(['Medium']);
-    expect(checked(find(menu, 'Show After'))).toEqual(['30 seconds']);
+    expect(checked(find(menu, 'Show After'))).toEqual(['30 seconds', "Wait While I'm Looking at the Screen"]);
     expect(checked(find(menu, 'Look'))).toEqual(['Classic']);
     expect(checked(find(menu, 'Eye Color'))).toEqual(['Blue']);
     expect(checked(find(menu, 'Background'))).toEqual(['Light']);
@@ -66,7 +66,12 @@ describe('tray menu model', () => {
 
   it('has the waiting and screen saver options', () => {
     const menu = buildMenuModel(defaultSettings(), [], [], 'darwin');
-    expect(find(menu, "Wait While I'm Looking at the Screen").checked).toBe(true);
+    expect(menu.some((n) => n.label === "Wait While I'm Looking at the Screen")).toBe(false);
+    const showAfter = find(menu, 'Show After');
+    const wait = find(showAfter.submenu!, "Wait While I'm Looking at the Screen");
+    expect(wait.checked).toBe(true);
+    expect(wait.action).toEqual({ kind: 'patch', patch: { waitWhileWatched: false } });
+    expect(checked(showAfter)).toEqual(['30 seconds', "Wait While I'm Looking at the Screen"]);
     const saver = find(menu, 'Screen Saver');
     expect(checked(saver)).toEqual(['Pause the eyes during the screen saver']);
     expect(find(saver.submenu!, 'Eyes replace the screen saver').action).toEqual({ kind: 'patch', patch: { screenSaver: 'replace' } });
