@@ -22,6 +22,8 @@ const api: BigEyesApi = {
   onVisibility: (listener) => void ipcRenderer.on(IPC.visibility, (_e, v) => listener(Boolean(v))),
   onCalibrate: (listener) => void ipcRenderer.on(IPC.calibrate, () => listener()),
   onFaces: (listener) => void ipcRenderer.on(IPC.facesBroadcast, (_e, m) => listener(m)),
+  onPresenceCheck: (listener) => void ipcRenderer.on(IPC.presenceCheck, (_e, active) => listener(Boolean(active))),
+  sendPresenceFaces: (message) => ipcRenderer.send(IPC.presenceFaces, message),
   onStatus: (listener) => void ipcRenderer.on(IPC.status, (_e, m) => listener(String(m))),
   sendFaces: (message) => ipcRenderer.send(IPC.faces, message),
   sendCameras: (cameras) => ipcRenderer.send(IPC.cameras, cameras),
@@ -30,6 +32,10 @@ const api: BigEyesApi = {
   sendEyeArea: (rect) => ipcRenderer.send(IPC.eyeArea, rect),
   requestClose: () => ipcRenderer.send(IPC.requestClose),
   preview: () => ipcRenderer.send(IPC.preview),
+  getAbout: () => ipcRenderer.invoke(IPC.getAbout),
+  onAboutUpdate: (listener) => void ipcRenderer.on(IPC.aboutUpdate, (_e, info) => listener(info)),
+  checkUpdates: () => ipcRenderer.send(IPC.checkUpdates),
+  openLink: (url) => ipcRenderer.send(IPC.openLink, url),
   calibrate: () => ipcRenderer.send(IPC.requestCalibrate),
 };
 

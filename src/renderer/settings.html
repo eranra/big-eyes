@@ -157,6 +157,14 @@
           <input id="idleTimeout" type="range" min="5" max="600" step="5" />
           <output for="idleTimeout"></output>
         </label>
+        <label class="row check">
+          <input id="waitWhileWatched" type="checkbox" />
+          <span>Wait while someone is looking at the screen (a short camera check before the eyes appear)</span>
+        </label>
+        <div class="row">
+          <span>Screen saver</span>
+          <select id="screenSaver"></select>
+        </div>
         <label class="row check mac-only">
           <input id="respectVideoPlayback" type="checkbox" />
           <span>Don't show while a video or presentation is playing</span>

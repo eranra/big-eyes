@@ -10,6 +10,7 @@ import {
   matchingTheme,
   MOUSE_RULES,
   POSITIONS,
+  SCREEN_SAVER_MODES,
   THEMES,
   type Settings,
 } from '../core/settings';
@@ -20,7 +21,10 @@ import {
  */
 export type MenuAction =
   | { kind: 'patch'; patch: Record<string, unknown> }
-  | { kind: 'command'; command: 'show' | 'calibrate' | 'settings' | 'quit' | 'refreshCameras' };
+  | {
+      kind: 'command';
+      command: 'show' | 'calibrate' | 'settings' | 'quit' | 'refreshCameras' | 'about' | 'checkUpdates' | 'update';
+    };
 
 export interface MenuNode {
   label?: string;
@@ -196,13 +200,19 @@ export function buildMenuModel(
   cameras: readonly CameraInfo[],
   displays: readonly DisplaySummary[],
   platform: NodeJS.Platform = process.platform,
+  /** "Update Available: 0.3.0…" and similar, shown at the top when set. */
+  updateLabel: string | null = null,
 ): MenuNode[] {
+  const top: MenuNode[] = updateLabel ? [{ label: updateLabel, action: command('update') }, separator] : [];
   const items: MenuNode[] = [
+    ...top,
     { label: 'Show Eyes Now', accelerator: 'CommandOrControl+E', action: command('show') },
     { label: 'Calibrate Eye Contact…', action: command('calibrate') },
     separator,
     presetMenu('Eye Size', EYE_SIZE_PRESETS, settings.eyeSize, near, (v) => ({ eyeSize: v })),
     presetMenu('Show After', IDLE_PRESETS, settings.idleTimeout, near, (v) => ({ idleTimeout: v })),
+    toggle("Wait While I'm Looking at the Screen", settings.waitWhileWatched, 'waitWhileWatched'),
+    presetMenu('Screen Saver', SCREEN_SAVER_MODES, settings.screenSaver, (a, b) => a === b, (v) => ({ screenSaver: v })),
     themeMenu(settings),
     presetMenu('Position', POSITIONS, settings.position, (a, b) => a === b, (v) => ({ position: v })),
     presetMenu('Eye Color', IRIS_PRESETS, settings.irisColor, (a, b) => a === b, (v) => ({ irisColor: v })),
@@ -233,6 +243,9 @@ export function buildMenuModel(
     toggle('Show Debug Info', settings.showDebugInfo, 'showDebugInfo'),
     separator,
     { label: 'Settings…', accelerator: 'CommandOrControl+,', action: command('settings') },
+    { label: 'About Big Eyes', action: command('about') },
+    { label: 'Check for Updates…', action: command('checkUpdates') },
+    toggle('Check for Updates Automatically', settings.checkForUpdates, 'checkForUpdates'),
     toggle(settings.paused ? 'Paused' : 'Pause', settings.paused, 'paused'),
     separator,
     { label: 'Quit Big Eyes', accelerator: 'CommandOrControl+Q', action: command('quit') },
