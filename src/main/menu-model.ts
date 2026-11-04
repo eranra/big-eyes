@@ -137,6 +137,19 @@ export function screensMenu(settings: Settings, displays: readonly DisplaySummar
   return { label: 'Screens', type: 'submenu', submenu: items };
 }
 
+/** "Show After": the idle time, plus the option to wait while someone looks at the screen. */
+export function showAfterMenu(settings: Settings): MenuNode {
+  const times = presetMenu('Show After', IDLE_PRESETS, settings.idleTimeout, near, (v) => ({ idleTimeout: v }));
+  return {
+    ...times,
+    submenu: [
+      ...times.submenu!,
+      separator,
+      toggle("Wait While I'm Looking at the Screen", settings.waitWhileWatched, 'waitWhileWatched'),
+    ],
+  };
+}
+
 export function blinkMenu(settings: Settings): MenuNode {
   const rate = presetMenu('', BLINK_RATE_PRESETS, settings.blink.rate, near, (v) => ({ blink: { rate: v } }));
   const speed = presetMenu('', BLINK_SPEED_PRESETS, settings.blink.speed, near, (v) => ({ blink: { speed: v } }));
@@ -210,8 +223,7 @@ export function buildMenuModel(
     { label: 'Calibrate Eye Contact…', action: command('calibrate') },
     separator,
     presetMenu('Eye Size', EYE_SIZE_PRESETS, settings.eyeSize, near, (v) => ({ eyeSize: v })),
-    presetMenu('Show After', IDLE_PRESETS, settings.idleTimeout, near, (v) => ({ idleTimeout: v })),
-    toggle("Wait While I'm Looking at the Screen", settings.waitWhileWatched, 'waitWhileWatched'),
+    showAfterMenu(settings),
     presetMenu('Screen Saver', SCREEN_SAVER_MODES, settings.screenSaver, (a, b) => a === b, (v) => ({ screenSaver: v })),
     themeMenu(settings),
     presetMenu('Position', POSITIONS, settings.position, (a, b) => a === b, (v) => ({ position: v })),

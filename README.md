@@ -158,7 +158,7 @@ Details: [docs/privacy.md](docs/privacy.md).
 | The eyes don't smile when I look at them | Menu → **Calibrate Eye Contact…** |
 | The eyes look the wrong way | Menu → **Mirror Camera** |
 | The eyes close too easily | Menu → **Closing** → **Mouse movement never closes them** |
-| The eyes never appear | Check that **Pause** is off. If you sit in front of the screen, **Wait While I'm Looking** holds them back — that's on purpose. On macOS, a video tab or call can hold them back (**Don't Show During Video**). |
+| The eyes never appear | Check that **Pause** is off. If you sit in front of the screen, **Show After → Wait While I'm Looking at the Screen** holds them back — that's on purpose. On macOS, a video tab or call can hold them back (**Don't Show During Video**). |
 | "I can't see you" | Allow camera access: macOS **System Settings → Privacy & Security → Camera**; Windows **Settings → Privacy → Camera**. |
 | Wrong camera or screen | Menu → **Cameras** / **Screens** |
 | The eyes don't smile back | Smile clearly while looking at them. Check **Smile Back When You Smile** in the menu |
