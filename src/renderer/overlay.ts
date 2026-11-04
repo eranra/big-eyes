@@ -35,8 +35,8 @@ let messageTimer = 0;
 const GUIDED_STEPS: ReadonlyArray<{ until: number; text: string; phase: string }> = [
   { until: 3, text: 'Get ready…', phase: 'ready' },
   { until: 11, text: 'Look into my eyes', phase: 'LOOK' },
-  { until: 19, text: 'Now look away', phase: 'AWAY' },
-  { until: 27, text: 'Look back at me', phase: 'LOOK' },
+  { until: 19, text: 'Now smile at me 😊', phase: 'SMILE' },
+  { until: 27, text: 'Now look away', phase: 'AWAY' },
   { until: Infinity, text: 'Thank you', phase: 'done' },
 ];
 let guidedStart: number | null = null;
@@ -54,7 +54,8 @@ if (tracker) {
       lastLog = time;
       const f = faces[0];
       const step = guidedStep(performance.now() / 1000);
-      console.log((step ? `[${step.phase}] ` : '') + `faces=${faces.length} mood=${animator.mood}` + (f ? ` yaw=${f.yaw.toFixed(1)} pitch=${f.pitch.toFixed(1)} gaze=${f.gaze ? f.gaze.x.toFixed(2) + ',' + f.gaze.y.toFixed(2) : '-'} pos=${animator.person.position.x.toFixed(2)},${animator.person.position.y.toFixed(2)} contact=${animator.person.contactScore.toFixed(2)}` : ''));
+      const perCamera = [0, 1, 2].map((c) => faces.filter((x) => (x.camera ?? 0) === c).length).join('/');
+      console.log((step ? `[${step.phase}] ` : '') + `faces=${perCamera} smile=${animator.person.smile.toFixed(2)}${animator.person.isSmiling ? '!' : ''} mood=${animator.mood}` + (f ? ` yaw=${f.yaw.toFixed(1)} pitch=${f.pitch.toFixed(1)} gaze=${f.gaze ? f.gaze.x.toFixed(2) + ',' + f.gaze.y.toFixed(2) : '-'} pos=${animator.person.position.x.toFixed(2)},${animator.person.position.y.toFixed(2)} contact=${animator.person.contactScore.toFixed(2)}` : ''));
     }
     animator.ingest(faces, time);
     api.sendFaces({ faces, time });
@@ -77,8 +78,7 @@ window.addEventListener('resize', resize);
 resize();
 
 function applySettings(next: Settings): void {
-  const cameraChanged =
-    next.cameraId !== settings.cameraId || next.cameraLabel !== settings.cameraLabel || next.cameraKind !== settings.cameraKind;
+  const cameraChanged = JSON.stringify(next.cameras) !== JSON.stringify(settings.cameras);
   settings = next;
   animator.apply(next);
   document.documentElement.style.setProperty('--dim', String(next.backgroundDim));
@@ -88,8 +88,8 @@ function applySettings(next: Settings): void {
 
 async function startTracker(): Promise<void> {
   if (!tracker) return;
-  await tracker.start(settings);
-  if (settings.showDebugInfo) console.log(`camera opened: ${tracker.activeCameraLabel ?? 'none'}`);
+  await tracker.start(settings.cameras);
+  if (settings.showDebugInfo) console.log(`cameras opened: ${tracker.activeCameraLabels.join(' + ') || 'none'}`);
   await reportCameras();
 }
 
@@ -171,7 +171,7 @@ function debugText(): string {
     const gaze = f.gaze ? `${n(f.gaze.x)}, ${n(f.gaze.y)}` : '-';
     lines.push(`yaw: ${n(f.yaw, 1)}   pitch: ${n(f.pitch, 1)}   gaze: ${gaze}`);
   }
-  lines.push(`role: ${isTracker ? 'tracker' : 'mirror'}   camera: ${tracker?.activeCameraLabel ?? settings.cameraLabel ?? 'default'}`);
+  lines.push(`role: ${isTracker ? 'tracker' : 'mirror'}   cameras: ${tracker?.activeCameraLabels.join(' + ') || 'none'}`);
   return lines.join('\n');
 }
 

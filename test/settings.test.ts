@@ -6,8 +6,9 @@ describe('defaults', () => {
     const d = defaultSettings();
     expect(d.idleTimeout).toBe(30);
     expect(d.screens).toEqual({ mode: 'builtin' });
-    expect(d.cameraKind).toBe('builtin');
-    expect(d.cameraId).toBeNull();
+    expect(d.cameras).toEqual({ mode: 'builtin' });
+    expect(d.mood.smileBack).toBe(true);
+    expect(d.look.showMouth).toBe(true);
     expect(d.showCaptions).toBe(false);
     expect(matchingTheme(d)).toBe('classic');
   });
@@ -42,6 +43,28 @@ describe('look settings', () => {
   });
 });
 
+describe('camera settings', () => {
+  it('converts 0.1.0 settings files', () => {
+    expect(normalizeSettings({ cameraKind: 'builtin', cameraId: null, cameraLabel: null }).cameras).toEqual({ mode: 'builtin' });
+    expect(normalizeSettings({ cameraKind: 'default', cameraId: null, cameraLabel: null }).cameras).toEqual({ mode: 'default' });
+    expect(normalizeSettings({ cameraKind: 'builtin', cameraId: 'x1', cameraLabel: 'HD Pro Webcam C920' }).cameras).toEqual({
+      mode: 'selected',
+      cameras: [{ id: 'x1', label: 'HD Pro Webcam C920' }],
+    });
+    expect('cameraId' in normalizeSettings({ cameraId: 'x' })).toBe(false);
+  });
+
+  it('validates the camera list', () => {
+    const s = normalizeSettings({
+      cameras: { mode: 'selected', cameras: [{ id: 'a', label: 'A' }, { id: 'a', label: 'A again' }, { id: 5 }, 'x', { id: '', label: 'B' }] },
+    });
+    expect(s.cameras).toEqual({ mode: 'selected', cameras: [{ id: 'a', label: 'A' }, { id: '', label: 'B' }] });
+    expect(normalizeSettings({ cameras: { mode: 'selected', cameras: [] } }).cameras).toEqual({ mode: 'builtin' });
+    expect(normalizeSettings({ cameras: { mode: 'all' } }).cameras).toEqual({ mode: 'all' });
+    expect(normalizeSettings({ cameras: { mode: 'many' } }).cameras).toEqual({ mode: 'builtin' });
+  });
+});
+
 describe('settings validation', () => {
   it('returns defaults for garbage input', () => {
     expect(normalizeSettings(null)).toEqual(defaultSettings());
@@ -56,7 +79,6 @@ describe('settings validation', () => {
       backgroundDim: -1,
       irisColor: 'red',
       welcomeText: 'x'.repeat(100),
-      cameraId: '',
       screens: { mode: 'selected', ids: [3, 3, 'a', 4.5, 7] },
       unknownKey: true,
     });
@@ -66,7 +88,6 @@ describe('settings validation', () => {
     expect(s.backgroundDim).toBe(0);
     expect(s.irisColor).toBe(defaultSettings().irisColor);
     expect(s.welcomeText).toHaveLength(40);
-    expect(s.cameraId).toBeNull();
     expect(s.screens).toEqual({ mode: 'selected', ids: [3, 7] });
     expect('unknownKey' in s).toBe(false);
   });
@@ -77,7 +98,11 @@ describe('settings validation', () => {
   });
 
   it('round-trips through JSON', () => {
-    const s = mergeSettings(defaultSettings(), { eyeSize: 1.35, cameraId: 'abc', screens: { mode: 'primary' } });
+    const s = mergeSettings(defaultSettings(), {
+      eyeSize: 1.35,
+      cameras: { mode: 'selected', cameras: [{ id: 'abc', label: 'Cam' }] },
+      screens: { mode: 'primary' },
+    });
     expect(normalizeSettings(JSON.parse(JSON.stringify(s)))).toEqual(s);
   });
 

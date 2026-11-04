@@ -1,35 +1,46 @@
-import { FaceLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
+import { FaceLandmarker, FilesetResolver, type FaceLandmarkerOptions } from '@mediapipe/tasks-vision';
+import { chooseCameras } from '../core/camera';
 import { faceFromLandmarks, type FaceObservation } from '../core/face';
-import { chooseCamera } from '../core/camera';
 import type { CameraInfo } from '../core/ipc';
-import type { Settings } from '../core/settings';
+import type { CameraChoice } from '../core/settings';
+
+/** One open camera with its own MediaPipe landmarker (VIDEO mode needs one per video stream). */
+interface CameraStream {
+  index: number;
+  label: string;
+  stream: MediaStream;
+  video: HTMLVideoElement;
+  landmarker: FaceLandmarker;
+  lastVideoTime: number;
+  lastTimestamp: number;
+}
 
 /**
- * Reads the camera and finds faces with MediaPipe Face Landmarker. Everything runs on this computer.
+ * Reads one or more cameras and finds faces with MediaPipe Face Landmarker. Everything runs on this computer.
  * No frames are stored or sent anywhere.
+ *
+ * With several cameras, each frame of the loop processes the next camera in turn, so the work per
+ * frame stays the same. Faces are tagged with the camera index (0 = main camera).
  */
 export class FaceTracker {
-  private landmarker: FaceLandmarker | null = null;
-  private loading: Promise<FaceLandmarker> | null = null;
-  private video: HTMLVideoElement;
-  private stream: MediaStream | null = null;
+  private fileset: Promise<Awaited<ReturnType<typeof FilesetResolver.forVisionTasks>>> | null = null;
+  private delegate: 'GPU' | 'CPU' = 'GPU';
+  private streams: CameraStream[] = [];
   private running = false;
-  /** id and label of the requested camera, to skip restarts when nothing changed. */
-  private cameraId: string | null = null;
-  private lastVideoTime = -1;
-  private lastDetect = 0;
+  private startKey: string | null = null;
+  private startToken = 0;
   private frameHandle = 0;
-  /** About 20 detections per second is enough for smooth eyes and saves energy. */
+  private lastDetect = 0;
+  private next = 0;
+  /** Latest faces per camera, so every report contains all cameras. */
+  private latest = new Map<number, { faces: FaceObservation[]; time: number }>();
+  /** About 20 detections per second in total is enough for smooth eyes. */
   private readonly minInterval = 1000 / 20;
 
   onFaces: (faces: FaceObservation[], time: number) => void = () => {};
   onError: (message: string) => void = () => {};
 
-  constructor(private readonly baseUrl: string) {
-    this.video = document.createElement('video');
-    this.video.muted = true;
-    this.video.playsInline = true;
-  }
+  constructor(private readonly baseUrl: string) {}
 
   /** Lists video input devices. Labels are empty until camera permission is granted once. */
   static async listCameras(): Promise<CameraInfo[]> {
@@ -40,110 +51,155 @@ export class FaceTracker {
       .map((d, i) => ({ deviceId: d.deviceId, label: d.label || `Camera ${i + 1}` }));
   }
 
-  private load(): Promise<FaceLandmarker> {
-    this.loading ??= (async () => {
-      const fileset = await FilesetResolver.forVisionTasks(`${this.baseUrl}wasm`);
-      const options = (delegate: 'GPU' | 'CPU') => ({
-        baseOptions: { modelAssetPath: `${this.baseUrl}models/face_landmarker.task`, delegate },
-        runningMode: 'VIDEO' as const,
-        numFaces: 3,
-        outputFaceBlendshapes: true,
-        outputFacialTransformationMatrixes: true,
-        minFaceDetectionConfidence: 0.5,
-        minFacePresenceConfidence: 0.5,
-        minTrackingConfidence: 0.5,
-      });
-      try {
-        return await FaceLandmarker.createFromOptions(fileset, options('GPU'));
-      } catch {
-        return await FaceLandmarker.createFromOptions(fileset, options('CPU'));
-      }
-    })();
-    return this.loading;
+  /** Labels of the cameras that are open now, main camera first. */
+  get activeCameraLabels(): string[] {
+    return this.streams.map((s) => s.label);
   }
 
-  /** Label of the camera that is open now, or null. */
-  get activeCameraLabel(): string | null {
-    return this.stream?.getVideoTracks()[0]?.label ?? null;
-  }
-
-  /** Starts the camera chosen by the settings (see `chooseCamera`) and face tracking. */
-  async start(camera: Pick<Settings, 'cameraId' | 'cameraLabel' | 'cameraKind'>): Promise<void> {
-    const key = `${camera.cameraId ?? ''}|${camera.cameraLabel ?? ''}|${camera.cameraKind}`;
-    if (this.running && key === this.cameraId) return;
-    this.stop();
-    this.running = true;
-    this.cameraId = key;
+  private async createLandmarker(): Promise<FaceLandmarker> {
+    this.fileset ??= FilesetResolver.forVisionTasks(`${this.baseUrl}wasm`);
+    const fileset = await this.fileset;
+    const options = (delegate: 'GPU' | 'CPU'): FaceLandmarkerOptions => ({
+      baseOptions: { modelAssetPath: `${this.baseUrl}models/face_landmarker.task`, delegate },
+      runningMode: 'VIDEO',
+      numFaces: 3,
+      outputFaceBlendshapes: true,
+      outputFacialTransformationMatrixes: true,
+      minFaceDetectionConfidence: 0.5,
+      minFacePresenceConfidence: 0.5,
+      minTrackingConfidence: 0.5,
+    });
     try {
-      const [landmarker, stream] = await Promise.all([this.load(), this.openCamera(camera)]);
-      if (!this.running) {
-        stream.getTracks().forEach((t) => t.stop());
-        return;
-      }
-      this.landmarker = landmarker;
-      this.stream = stream;
-      this.video.srcObject = stream;
-      await this.video.play();
-      this.loop();
-    } catch (error) {
-      this.running = false;
-      this.onError(describeError(error));
+      return await FaceLandmarker.createFromOptions(fileset, options(this.delegate));
+    } catch {
+      this.delegate = 'CPU';
+      return FaceLandmarker.createFromOptions(fileset, options('CPU'));
     }
   }
 
-  private async openCamera(camera: Pick<Settings, 'cameraId' | 'cameraLabel' | 'cameraKind'>): Promise<MediaStream> {
-    const video: MediaTrackConstraints = { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 30 } };
-    // Labels are empty until camera access is granted once. Ask with the default camera, then choose.
+  /** Starts the cameras chosen by the settings and face tracking. */
+  async start(choice: CameraChoice): Promise<void> {
+    const key = JSON.stringify(choice);
+    if (this.running && key === this.startKey) return;
+    this.stop();
+    this.running = true;
+    this.startKey = key;
+    const token = ++this.startToken;
+    try {
+      const ids = await this.resolveIds(choice);
+      const opened: CameraStream[] = [];
+      // Open one by one: some systems fail when two cameras start at the same moment.
+      for (const id of ids.length ? ids : [null]) {
+        try {
+          const stream = await openCamera(id);
+          const video = document.createElement('video');
+          video.muted = true;
+          video.playsInline = true;
+          video.srcObject = stream;
+          await video.play();
+          const landmarker = await this.createLandmarker();
+          const label = stream.getVideoTracks()[0]?.label ?? 'Camera';
+          opened.push({ index: opened.length, label, stream, video, landmarker, lastVideoTime: -1, lastTimestamp: 0 });
+        } catch (error) {
+          // One camera failing (busy, unplugged) must not stop the others.
+          if (ids.length <= 1) throw error;
+          console.warn('[big-eyes] could not open a camera:', describeError(error));
+        }
+        if (token !== this.startToken) break;
+      }
+      if (token !== this.startToken || !this.running) {
+        closeStreams(opened);
+        return;
+      }
+      if (!opened.length) throw new DOMException('No camera could be opened', 'NotReadableError');
+      this.streams = opened;
+      this.loop();
+    } catch (error) {
+      if (token === this.startToken) {
+        this.running = false;
+        this.onError(describeError(error));
+      }
+    }
+  }
+
+  private async resolveIds(choice: CameraChoice): Promise<string[]> {
     let cameras = await FaceTracker.listCameras();
-    if (cameras.length && cameras.every((c) => /^Camera \d+$/.test(c.label))) {
+    // Names are hidden until camera access is granted once. Open the default camera briefly, then list again.
+    if (choice.mode !== 'default' && cameras.length && cameras.every((c) => /^Camera \d+$/.test(c.label))) {
       const probe = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
       probe.getTracks().forEach((t) => t.stop());
       cameras = await FaceTracker.listCameras();
     }
-    const deviceId = chooseCamera(cameras, camera);
-    if (deviceId) {
-      try {
-        return await navigator.mediaDevices.getUserMedia({ video: { ...video, deviceId: { exact: deviceId } }, audio: false });
-      } catch {
-        // The camera is busy or gone. Use the system default below.
-      }
-    }
-    return navigator.mediaDevices.getUserMedia({ video, audio: false });
+    return chooseCameras(cameras, choice);
   }
 
   stop(): void {
     this.running = false;
+    this.startToken++;
     cancelAnimationFrame(this.frameHandle);
-    this.stream?.getTracks().forEach((t) => t.stop());
-    this.stream = null;
-    this.video.srcObject = null;
-    this.lastVideoTime = -1;
+    closeStreams(this.streams);
+    this.streams = [];
+    this.latest.clear();
   }
 
   private loop = (): void => {
     if (!this.running) return;
     this.frameHandle = requestAnimationFrame(this.loop);
     const now = performance.now();
-    if (!this.landmarker || this.video.readyState < 2 || now - this.lastDetect < this.minInterval) return;
-    if (this.video.currentTime === this.lastVideoTime) return;
-    this.lastVideoTime = this.video.currentTime;
-    this.lastDetect = now;
+    if (!this.streams.length || now - this.lastDetect < this.minInterval) return;
+    // Next camera in turn. Skip cameras without a new frame.
+    for (let tries = 0; tries < this.streams.length; tries++) {
+      const cam = this.streams[this.next % this.streams.length]!;
+      this.next++;
+      if (cam.video.readyState < 2 || cam.video.currentTime === cam.lastVideoTime) continue;
+      cam.lastVideoTime = cam.video.currentTime;
+      this.lastDetect = now;
+      this.detect(cam, now);
+      break;
+    }
+  };
+
+  private detect(cam: CameraStream, now: number): void {
     try {
-      const result = this.landmarker.detectForVideo(this.video, now);
+      // Timestamps must grow for each landmarker.
+      const timestamp = Math.max(now, cam.lastTimestamp + 1);
+      cam.lastTimestamp = timestamp;
+      const result = cam.landmarker.detectForVideo(cam.video, timestamp);
       const faces: FaceObservation[] = [];
       result.faceLandmarks.forEach((landmarks, i) => {
-        const face = faceFromLandmarks(
-          landmarks,
-          result.faceBlendshapes?.[i]?.categories,
-          result.facialTransformationMatrixes?.[i]?.data,
-        );
-        if (face) faces.push(face);
+        const face = faceFromLandmarks(landmarks, result.faceBlendshapes?.[i]?.categories, result.facialTransformationMatrixes?.[i]?.data);
+        if (face) faces.push({ ...face, camera: cam.index });
       });
-      this.onFaces(faces, now / 1000);
+      const time = now / 1000;
+      this.latest.set(cam.index, { faces, time });
+      // Report all cameras' latest faces. Drop results older than half a second.
+      const all: FaceObservation[] = [];
+      for (const entry of this.latest.values()) if (time - entry.time < 0.5) all.push(...entry.faces);
+      this.onFaces(all, time);
     } catch (error) {
       this.onError(describeError(error));
     }
-  };
+  }
+}
+
+async function openCamera(deviceId: string | null): Promise<MediaStream> {
+  const video: MediaTrackConstraints = { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 30 } };
+  if (deviceId) {
+    try {
+      return await navigator.mediaDevices.getUserMedia({ video: { ...video, deviceId: { exact: deviceId } }, audio: false });
+    } catch {
+      // The camera is busy or gone. Use the system default below.
+    }
+  }
+  return navigator.mediaDevices.getUserMedia({ video, audio: false });
+}
+
+function closeStreams(streams: readonly CameraStream[]): void {
+  for (const s of streams) {
+    s.stream.getTracks().forEach((t) => t.stop());
+    s.video.srcObject = null;
+    s.landmarker.close();
+  }
 }
 
 function describeError(error: unknown): string {

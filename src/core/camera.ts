@@ -1,5 +1,5 @@
 import type { CameraInfo } from './ipc';
-import type { Settings } from './settings';
+import type { CameraChoice, SavedCamera } from './settings';
 
 /**
  * Words that built-in cameras use in their names:
@@ -15,22 +15,55 @@ export function isBuiltInCamera(label: string): boolean {
   return BUILT_IN_PATTERNS.some((p) => p.test(label)) && !NOT_BUILT_IN.some((p) => p.test(label));
 }
 
+/** Cameras that should not be used automatically ("all" mode): phone and virtual cameras. */
+function isVirtualOrPhone(label: string): boolean {
+  return NOT_BUILT_IN.some((p) => p.test(label));
+}
+
+/** Finds a saved camera in the list: by id first, then by exact name, then by part of the name. */
+export function findCamera(cameras: readonly CameraInfo[], saved: SavedCamera): CameraInfo | null {
+  const byId = saved.id ? cameras.find((c) => c.deviceId === saved.id) : undefined;
+  if (byId) return byId;
+  if (!saved.label) return null;
+  const wanted = saved.label.toLowerCase();
+  return cameras.find((c) => c.label.toLowerCase() === wanted) ?? cameras.find((c) => c.label.toLowerCase().includes(wanted)) ?? null;
+}
+
 /**
- * Picks the camera to open. Returns its `deviceId`, or null for "let the system choose".
+ * Picks the cameras to open, main camera first. Returns device ids.
+ * An empty list means "let the system choose one" (the system default camera).
  *
- * Order: the saved camera id, then a camera with the saved name (ids can change between runs or
- * when the camera is plugged in again), then the built-in camera when `cameraKind` is 'builtin'.
+ * - builtin: the built-in camera, else the system default;
+ * - default: the system default;
+ * - all: every camera, built-in first; phone and virtual cameras are skipped unless nothing else exists;
+ * - selected: the chosen cameras that are connected, in the saved order. If none is connected: system default.
  */
-export function chooseCamera(cameras: readonly CameraInfo[], s: Pick<Settings, 'cameraId' | 'cameraLabel' | 'cameraKind'>): string | null {
-  if (s.cameraId && cameras.some((c) => c.deviceId === s.cameraId)) return s.cameraId;
-  if (s.cameraLabel) {
-    const wanted = s.cameraLabel.toLowerCase();
-    const byName = cameras.find((c) => c.label.toLowerCase() === wanted) ?? cameras.find((c) => c.label.toLowerCase().includes(wanted));
-    if (byName) return byName.deviceId;
+export function chooseCameras(cameras: readonly CameraInfo[], choice: CameraChoice): string[] {
+  switch (choice.mode) {
+    case 'default':
+      return [];
+    case 'builtin': {
+      const builtIn = cameras.find((c) => isBuiltInCamera(c.label));
+      return builtIn ? [builtIn.deviceId] : [];
+    }
+    case 'all': {
+      const real = cameras.filter((c) => !isVirtualOrPhone(c.label));
+      const list = real.length ? real : [...cameras];
+      list.sort((a, b) => Number(isBuiltInCamera(b.label)) - Number(isBuiltInCamera(a.label)));
+      return list.map((c) => c.deviceId);
+    }
+    case 'selected': {
+      const ids: string[] = [];
+      for (const saved of choice.cameras) {
+        const found = findCamera(cameras, saved);
+        if (found && !ids.includes(found.deviceId)) ids.push(found.deviceId);
+      }
+      return ids;
+    }
   }
-  if (s.cameraId === null && s.cameraLabel === null && s.cameraKind === 'builtin') {
-    const builtIn = cameras.find((c) => isBuiltInCamera(c.label));
-    if (builtIn) return builtIn.deviceId;
-  }
-  return null;
+}
+
+/** True when two camera choices pick the same cameras. */
+export function sameCameraChoice(a: CameraChoice, b: CameraChoice): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
 }

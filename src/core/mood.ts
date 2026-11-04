@@ -11,10 +11,12 @@ export type Mood =
   | 'curious'
   /** The person looks back at the eyes. Eyes smile and say "Welcome". */
   | 'happy'
+  /** The person smiles at the eyes. The eyes smile back with a big smile and a mouth. */
+  | 'delighted'
   /** The person looks away for a while. Heavy lids, eyes look away, "Bored". */
   | 'bored';
 
-export const MOODS: readonly Mood[] = ['sleeping', 'surprised', 'curious', 'happy', 'bored'];
+export const MOODS: readonly Mood[] = ['sleeping', 'surprised', 'curious', 'happy', 'delighted', 'bored'];
 
 /**
  * Decides the mood from the person state over time.
@@ -30,6 +32,8 @@ export class MoodMachine {
   private noContactSince: number | null;
   private absentSince: number | null;
   private wasPresent = false;
+  private smileSince: number | null = null;
+  private noSmileSince: number | null = null;
 
   constructor(settings: MoodSettings = defaultSettings().mood, initial: Mood = 'curious', now = 0) {
     this.settings = settings;
@@ -54,6 +58,14 @@ export class MoodMachine {
     } else {
       this.contactSince = null;
       this.noContactSince ??= now;
+    }
+    // A smile counts while the person is there and smiling (from any camera).
+    if (person.isPresent && person.isSmiling) {
+      this.smileSince ??= now;
+      this.noSmileSince = null;
+    } else {
+      this.smileSince = null;
+      this.noSmileSince ??= now;
     }
     const justAppeared = person.isPresent && !this.wasPresent;
     this.wasPresent = person.isPresent;
@@ -81,8 +93,16 @@ export class MoodMachine {
       return 'surprised';
     }
     if (this.mood === 'surprised' && this.timeInMood(now) < s.surpriseDuration) return 'surprised';
+    const smileTime = this.smileSince === null ? 0 : now - this.smileSince;
+    const noSmileTime = this.noSmileSince === null ? 0 : now - this.noSmileSince;
+    const friendly = this.mood === 'happy' || this.mood === 'delighted';
+    // Smiling back: the person smiles while making eye contact (or right after, while still happy).
+    if (s.smileBack && smileTime >= s.smileToDelighted && (contactTime > 0 || friendly)) return 'delighted';
+    if (this.mood === 'delighted' && noSmileTime < s.delightedHold && (contactTime > 0 || noContactTime < s.happyHold)) {
+      return 'delighted';
+    }
     if (contactTime >= s.contactToHappy) return 'happy';
-    if (this.mood === 'happy' && noContactTime < s.happyHold) return 'happy';
+    if (friendly && noContactTime < s.happyHold) return 'happy';
     if (noContactTime >= s.awayToBored) return 'bored';
     // Short glance from bored is not enough: stay bored until real eye contact comes back.
     if (this.mood === 'bored') return 'bored';

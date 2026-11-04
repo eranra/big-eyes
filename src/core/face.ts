@@ -23,6 +23,8 @@ export interface FaceObservation {
   blink: number;
   /** Detector confidence, 0..1. */
   confidence: number;
+  /** Which camera saw this face: 0 = the main camera, 1.. = extra cameras. */
+  camera?: number;
 }
 
 export function makeFace(partial: Partial<FaceObservation> & Pick<FaceObservation, 'center' | 'size'>): FaceObservation {

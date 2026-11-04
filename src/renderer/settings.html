@@ -15,6 +15,7 @@
       <div class="mood-buttons" role="group" aria-label="Preview mood">
         <button data-mood="curious" class="on">Curious</button>
         <button data-mood="happy">Happy</button>
+        <button data-mood="delighted">Smiling back</button>
         <button data-mood="bored">Bored</button>
         <button data-mood="surprised">Surprised</button>
         <button data-mood="sleeping">Sleeping</button>
@@ -77,6 +78,7 @@
             <label><input id="browColor" type="color" /> Eyebrows</label>
             <label><input id="lashColor" type="color" /> Lashes</label>
             <label><input id="glowColor" type="color" /> Glow</label>
+            <label><input id="mouthColor" type="color" /> Lips</label>
           </span>
         </div>
         <label class="row">
@@ -87,10 +89,19 @@
         <label class="row check"><input id="showBrows" type="checkbox" /><span>Eyebrows</span></label>
         <label class="row check"><input id="showLashes" type="checkbox" /><span>Lashes</span></label>
         <label class="row check"><input id="showBlush" type="checkbox" /><span>Pink cheeks when smiling</span></label>
+        <label class="row check"><input id="showMouth" type="checkbox" /><span>Mouth</span></label>
         <label class="row">
           <span>Background</span>
           <input id="backgroundDim" type="range" min="0" max="0.95" step="0.05" />
           <output for="backgroundDim"></output>
+        </label>
+      </section>
+
+      <section>
+        <h2>Smiles</h2>
+        <label class="row check">
+          <input id="smileBack" type="checkbox" />
+          <span>When you smile at the eyes, they smile back</span>
         </label>
       </section>
 
@@ -161,19 +172,22 @@
       </section>
 
       <section>
-        <h2>Camera</h2>
-        <label class="row">
-          <span>Camera</span>
-          <select id="cameraId"></select>
-          <button id="refreshCameras" class="small" title="Refresh the camera list">↻</button>
-        </label>
-        <video id="cameraTest" muted playsinline hidden></video>
+        <h2>Cameras</h2>
+        <p class="hint">
+          With more than one camera, the first one checked is the main camera: the eyes follow what it sees and it decides
+          eye contact. The others help notice you when the main camera cannot.
+        </p>
+        <div id="cameras"></div>
+        <div class="row buttons">
+          <button id="refreshCameras" class="small" title="Refresh the camera list">↻ Refresh list</button>
+        </div>
+        <div id="cameraTests" class="camera-tests" hidden></div>
         <label class="row check">
           <input id="mirrorCamera" type="checkbox" />
           <span>Mirror camera (use if the eyes look the wrong way)</span>
         </label>
         <div class="row buttons">
-          <button id="testCamera">Test camera</button>
+          <button id="testCamera">Test cameras</button>
           <button id="calibrate">Calibrate eye contact…</button>
         </div>
       </section>

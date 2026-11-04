@@ -5,6 +5,23 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-04
+
+### Added
+
+- Several cameras at once: built-in, system default, all cameras, or a chosen list. The first chosen camera is the
+  main camera (position and eye contact); the others keep the person present when the main camera loses them.
+- Smile recognition and smile back: when you smile while looking at the eyes, they smile back ("delighted" mood)
+  with a big open smile, crescent eyes and a bounce.
+- An animated mouth under the eyes for every mood (smile, frown, surprised "o"), with a lip color per theme.
+- Settings: Smile Back, Show Mouth, lip color; camera test shows every chosen camera.
+
+### Changed
+
+- Settings files from 0.1.0 are converted: `cameraKind` / `cameraId` / `cameraLabel` become `cameras`.
+
+## [0.1.0] - 2026-11-04
+
 ### Added
 
 - Overlay eyes that appear after an idle time, on chosen screens, and hide on any input.

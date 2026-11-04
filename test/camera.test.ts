@@ -1,12 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { chooseCamera, isBuiltInCamera } from '../src/core/camera';
+import { chooseCameras, findCamera, isBuiltInCamera } from '../src/core/camera';
 
 const cams = [
   { deviceId: 'c920', label: 'HD Pro Webcam C920' },
   { deviceId: 'mbp', label: 'MacBook Pro Camera (0000:0001)' },
   { deviceId: 'phone', label: "Eran's iPhone Camera" },
 ];
-const auto = { cameraId: null, cameraLabel: null } as const;
 
 describe('built-in camera detection', () => {
   it('recognizes common built-in names', () => {
@@ -22,27 +21,54 @@ describe('built-in camera detection', () => {
   });
 });
 
-describe('chooseCamera', () => {
+describe('chooseCameras', () => {
   it('builtin picks the MacBook camera even when an external one is listed first', () => {
-    expect(chooseCamera(cams, { ...auto, cameraKind: 'builtin' })).toBe('mbp');
-  });
-
-  it('default leaves the choice to the system', () => {
-    expect(chooseCamera(cams, { ...auto, cameraKind: 'default' })).toBeNull();
+    expect(chooseCameras(cams, { mode: 'builtin' })).toEqual(['mbp']);
   });
 
   it('builtin without a built-in camera falls back to the system default', () => {
-    expect(chooseCamera(cams.slice(0, 1), { ...auto, cameraKind: 'builtin' })).toBeNull();
+    expect(chooseCameras(cams.slice(0, 1), { mode: 'builtin' })).toEqual([]);
   });
 
-  it('a saved id wins, then a saved name', () => {
-    expect(chooseCamera(cams, { cameraId: 'c920', cameraLabel: 'HD Pro Webcam C920', cameraKind: 'builtin' })).toBe('c920');
-    // The id changed (for example after plugging the camera in again): match by name.
-    expect(chooseCamera(cams, { cameraId: 'old-id', cameraLabel: 'HD Pro Webcam C920', cameraKind: 'builtin' })).toBe('c920');
-    expect(chooseCamera(cams, { cameraId: null, cameraLabel: 'macbook pro', cameraKind: 'default' })).toBe('mbp');
+  it('default leaves the choice to the system', () => {
+    expect(chooseCameras(cams, { mode: 'default' })).toEqual([]);
   });
 
-  it('a saved camera that is gone gives the system default, not the built-in camera', () => {
-    expect(chooseCamera(cams, { cameraId: 'gone', cameraLabel: 'Old Cam', cameraKind: 'builtin' })).toBeNull();
+  it('all uses every real camera, built-in first, and skips phones', () => {
+    expect(chooseCameras(cams, { mode: 'all' })).toEqual(['mbp', 'c920']);
+    // Only a phone camera: use it rather than nothing.
+    expect(chooseCameras(cams.slice(2), { mode: 'all' })).toEqual(['phone']);
+  });
+
+  it('selected keeps the saved order (first = main camera)', () => {
+    const choice = {
+      mode: 'selected' as const,
+      cameras: [
+        { id: 'c920', label: 'HD Pro Webcam C920' },
+        { id: 'mbp', label: 'MacBook Pro Camera (0000:0001)' },
+      ],
+    };
+    expect(chooseCameras(cams, choice)).toEqual(['c920', 'mbp']);
+  });
+
+  it('selected finds a camera by name when its id changed, and skips missing ones', () => {
+    const choice = {
+      mode: 'selected' as const,
+      cameras: [
+        { id: 'old-id', label: 'HD Pro Webcam C920' },
+        { id: 'gone', label: 'Old Cam' },
+        { id: '', label: 'macbook pro' },
+      ],
+    };
+    expect(chooseCameras(cams, choice)).toEqual(['c920', 'mbp']);
+  });
+
+  it('selected with nothing connected falls back to the system default', () => {
+    expect(chooseCameras(cams, { mode: 'selected', cameras: [{ id: 'gone', label: 'Old Cam' }] })).toEqual([]);
+  });
+
+  it('findCamera prefers the id', () => {
+    expect(findCamera(cams, { id: 'mbp', label: 'HD Pro Webcam C920' })?.deviceId).toBe('mbp');
+    expect(findCamera(cams, { id: '', label: '' })).toBeNull();
   });
 });

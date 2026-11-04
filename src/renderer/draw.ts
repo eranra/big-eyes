@@ -60,7 +60,7 @@ export function eyeLayout(
   let base = Math.min(width * 0.12, height * 0.19) * eyeSize * cornerScale;
   // Never larger than the screen: the whole group (about 3.9 x base wide plus spacing, 4 x base tall) must fit.
   const spacingFactor = 1.32 * Math.max(look.spacing, (shape.w * 1.1) / 1.32 + 0.02);
-  const maxBase = Math.min((width * 0.92) / (2 * (spacingFactor + shape.w * 1.2)), (height * 0.92) / (shape.h * 4.0 * 1.1));
+  const maxBase = Math.min((width * 0.92) / (2 * (spacingFactor + shape.w * 1.2)), (height * 0.92) / (shape.h * 4.3 * 1.1));
   base = Math.min(base, maxBase);
   const rx = base * pose.scale * shape.w;
   const ry = base * pose.scale * shape.h * (1 - pose.squash);
@@ -68,7 +68,7 @@ export function eyeLayout(
   // Half the size of the whole group: eyes, brows above, caption below.
   const halfW = spacing + base * shape.w * 1.2;
   const halfUp = base * shape.h * 1.9;
-  const halfDown = base * shape.h * 2.1;
+  const halfDown = base * shape.h * 2.4; // eyes, mouth and caption
   const margin = Math.min(width, height) * 0.04;
   let cx = width / 2;
   let cy = height / 2 - height * 0.03;
@@ -98,7 +98,7 @@ export function eyeBounds(l: EyeLayout): { x: number; y: number; width: number; 
   const left = l.cx - l.spacing - l.rx * 1.1;
   const right = l.cx + l.spacing + l.rx * 1.1;
   const top = l.cy - l.ry * 1.75; // includes the brows
-  const bottom = l.cy + l.ry * 1.15;
+  const bottom = l.cy + l.ry * 1.9; // includes the mouth
   return { x: left, y: top, width: right - left, height: bottom - top };
 }
 
@@ -132,9 +132,107 @@ export function drawEyes(ctx: CanvasRenderingContext2D, width: number, height: n
     drawEye(ctx, cx, l.cy, l.rx, l.ry, side, eyePose, o.irisColor, look);
     if (look.showBrows) drawBrow(ctx, cx, l.cy, l.rx, l.ry, side, pose, look.browColor);
   }
+  if (pose.mouthOpacity > 0.01) drawMouth(ctx, l, pose, look.mouthColor);
   drawCaption(ctx, l, pose, look.glowColor);
   if (pose.sleepOpacity > 0.01) drawSleep(ctx, l, pose, o.time);
   if (o.debug) drawDebug(ctx, o.debug, height);
+}
+
+/** Where the mouth sits: centered under the eyes. */
+export function mouthPlace(l: EyeLayout): { x: number; y: number; halfWidth: number } {
+  return { x: l.cx, y: l.cy + l.ry * 1.45, halfWidth: l.spacing * 0.55 };
+}
+
+/**
+ * The mouth. One curve for the upper lip and one for the lower lip.
+ * - `mouthSmile` bends both curves up at the corners (smile) or down (frown).
+ * - `mouthOpen` moves the lower lip down; the inside is dark, with a hint of teeth and tongue.
+ */
+function drawMouth(ctx: CanvasRenderingContext2D, l: EyeLayout, pose: EyePose, color: string): void {
+  const m = mouthPlace(l);
+  const w = m.halfWidth * pose.mouthWidth;
+  const smile = pose.mouthSmile;
+  const open = pose.mouthOpen;
+  const scaleY = l.ry * 0.5;
+  // Corner height: smiling lifts the corners. Middle dips down a bit more when smiling, like a real smile.
+  const cornerY = m.y - smile * scaleY * 0.45;
+  const midUpper = m.y + smile * scaleY * 0.15 - open * scaleY * 0.1;
+  const midLower = m.y + smile * scaleY * 0.55 + open * scaleY * (0.55 + 0.35 * Math.max(smile, 0));
+  const left = m.x - w;
+  const right = m.x + w;
+  const thickness = Math.max(3, l.rx * 0.07);
+
+  ctx.save();
+  ctx.globalAlpha = pose.mouthOpacity;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  // An open mouth without a smile is a round "o" (surprised). Blend toward it as the smile goes to zero.
+  const oval = open > 0.3 ? 1 - Math.min(1, Math.abs(smile) / 0.35) : 0;
+  if (oval > 0.5) {
+    const ow = w * 0.55;
+    const oh = scaleY * (0.25 + 0.55 * open);
+    ctx.beginPath();
+    ctx.ellipse(m.x, m.y + oh * 0.3, ow, oh, 0, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgb(58, 16, 30)';
+    ctx.fill();
+    ctx.strokeStyle = shade(color, 0);
+    ctx.lineWidth = thickness;
+    ctx.stroke();
+    ctx.restore();
+    return;
+  }
+  const upperPath = (): void => {
+    ctx.moveTo(left, cornerY);
+    ctx.bezierCurveTo(left + w * 0.45, midUpper, right - w * 0.45, midUpper, right, cornerY);
+  };
+  if (open > 0.06) {
+    // Inside of the mouth.
+    ctx.beginPath();
+    upperPath();
+    ctx.bezierCurveTo(right - w * 0.35, midLower, left + w * 0.35, midLower, left, cornerY);
+    ctx.closePath();
+    ctx.fillStyle = 'rgb(58, 16, 30)';
+    ctx.fill();
+    ctx.save();
+    ctx.clip();
+    // Top teeth: a soft white band under the upper lip, shown when smiling.
+    if (smile > 0.3) {
+      ctx.fillStyle = `rgba(255, 252, 245, ${Math.min(1, (smile - 0.3) * 2)})`;
+      ctx.beginPath();
+      ctx.moveTo(left, cornerY);
+      ctx.bezierCurveTo(left + w * 0.45, midUpper, right - w * 0.45, midUpper, right, cornerY);
+      ctx.lineTo(right, cornerY + scaleY * 0.25);
+      ctx.bezierCurveTo(right - w * 0.45, midUpper + scaleY * 0.28, left + w * 0.45, midUpper + scaleY * 0.28, left, cornerY + scaleY * 0.25);
+      ctx.closePath();
+      ctx.fill();
+    }
+    // Tongue.
+    ctx.fillStyle = 'rgb(226, 98, 118)';
+    ctx.beginPath();
+    ctx.ellipse(m.x, midLower - scaleY * 0.05, w * 0.42, scaleY * 0.35 * open + 2, 0, Math.PI, 0, true);
+    ctx.fill();
+    ctx.restore();
+  }
+  // Lips.
+  ctx.strokeStyle = shade(color, 0);
+  ctx.lineWidth = thickness;
+  ctx.beginPath();
+  upperPath();
+  if (open > 0.06) ctx.bezierCurveTo(right - w * 0.35, midLower, left + w * 0.35, midLower, left, cornerY);
+  ctx.stroke();
+  // Small dimples at the corners make a smile read clearly, even when small.
+  if (smile > 0.35) {
+    ctx.lineWidth = thickness * 0.7;
+    ctx.globalAlpha = pose.mouthOpacity * Math.min(1, (smile - 0.35) * 2);
+    for (const side of [-1, 1]) {
+      const cx = side < 0 ? left : right;
+      ctx.beginPath();
+      ctx.moveTo(cx - side * thickness * 0.2, cornerY - thickness * 0.2);
+      ctx.quadraticCurveTo(cx + side * thickness * 1.2, cornerY - thickness * 0.4, cx + side * thickness * 0.9, cornerY + thickness * 1.3);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
 }
 
 /** A soft ring around the eyes that fills up while you hold eye contact (look-to-close). */
@@ -477,7 +575,8 @@ function drawCaption(ctx: CanvasRenderingContext2D, l: EyeLayout, pose: EyePose,
   ctx.shadowColor = shade(iris, 0, 0.6 * alpha);
   ctx.shadowBlur = size * 0.5;
   ctx.fillStyle = `rgba(255, 255, 255, ${0.92 * alpha})`;
-  ctx.fillText(pose.caption, l.cx, l.cy + l.ry * 1.75 + rise);
+  const below = pose.mouthOpacity > 0.5 ? l.ry * 2.25 : l.ry * 1.75;
+  ctx.fillText(pose.caption, l.cx, l.cy + below + rise);
   ctx.restore();
 }
 

@@ -15,6 +15,10 @@ export interface PersonState {
   isMakingEyeContact: boolean;
   /** Smoothed smile of the person, 0..1. */
   smile: number;
+  /** Smile decision with hysteresis: the person is smiling now. */
+  isSmiling: boolean;
+  /** True when the main camera sees the person. False when only an extra camera does. */
+  seenByMainCamera: boolean;
   /** Time (s) of the last face detection. */
   lastSeen: number | null;
 }
@@ -26,8 +30,14 @@ export const ABSENT: Readonly<PersonState> = Object.freeze({
   contactScore: 0,
   isMakingEyeContact: false,
   smile: 0,
+  isSmiling: false,
+  seenByMainCamera: false,
   lastSeen: null,
 });
+
+/** Smile score needed to count as smiling, and the score below which it stops. */
+export const SMILE_ON = 0.45;
+export const SMILE_OFF = 0.25;
 
 /** Contact score needed to turn eye contact on, and the score below which it turns off. */
 export const CONTACT_ON = 0.62;
@@ -95,35 +105,70 @@ export class AttentionEstimator {
     return best;
   }
 
-  /** Feeds the detections from one camera frame. */
+  /**
+   * Feeds the latest detections. Faces may come from several cameras (`face.camera`, 0 = main camera).
+   *
+   * - The main camera decides where the person is and whether they make eye contact: it is the camera
+   *   next to the eyes, so "looking at the camera" means "looking at the eyes".
+   * - Extra cameras look from other angles. A face there keeps the person present (and lets smiles count),
+   *   but eye contact fades, because from the side every face looks turned away.
+   */
   ingest(faces: readonly FaceObservation[], time: number): void {
     const dt = this.lastUpdate === null ? 0 : time - this.lastUpdate;
     this.lastUpdate = time;
-    const face = this.chooseFace(faces);
-    if (!face) {
+    const main = faces.filter((f) => (f.camera ?? 0) === 0);
+    const face = this.chooseFace(main);
+    const other = face ? null : this.biggest(faces.filter((f) => (f.camera ?? 0) !== 0));
+    const st = this.state;
+    if (!face && !other) {
       this.decay(dt, time);
       return;
     }
-    this.lastObservation = face;
-    const position = this.screenPosition(face);
-    const raw = this.rawContactScore(face);
-    const st = this.state;
-    if (st.isPresent) {
-      const k = smoothingFactor(dt, this.settings.positionSmoothing);
-      st.position = lerpVec(st.position, position, k);
-      st.size = lerp(st.size, face.size, k);
-      st.contactScore = lerp(st.contactScore, raw, smoothingFactor(dt, this.settings.contactSmoothing));
-      st.smile = lerp(st.smile, face.smile, smoothingFactor(dt, 0.25));
+    if (face) {
+      this.lastObservation = face;
+      const position = this.screenPosition(face);
+      const raw = this.rawContactScore(face);
+      if (st.isPresent && st.seenByMainCamera) {
+        const k = smoothingFactor(dt, this.settings.positionSmoothing);
+        st.position = lerpVec(st.position, position, k);
+        st.size = lerp(st.size, face.size, k);
+        st.contactScore = lerp(st.contactScore, raw, smoothingFactor(dt, this.settings.contactSmoothing));
+      } else {
+        // New person for the main camera: jump to their position, build up eye contact from half.
+        st.position = position;
+        st.size = face.size;
+        st.contactScore = st.isPresent ? lerp(st.contactScore, raw, 0.5) : raw * 0.5;
+      }
+      st.seenByMainCamera = true;
     } else {
-      // New person: jump to their position, but build up eye contact from half.
-      st.isPresent = true;
-      st.position = position;
-      st.size = face.size;
-      st.contactScore = raw * 0.5;
-      st.smile = face.smile;
+      // Only an extra camera sees someone: keep the position, let eye contact fade.
+      if (!st.isPresent) {
+        st.position = { x: 0, y: 0 };
+        st.size = other!.size;
+      }
+      st.contactScore = lerp(st.contactScore, 0, smoothingFactor(dt, this.settings.contactSmoothing * 2));
+      st.seenByMainCamera = false;
     }
+    const smile = (face ?? other)!.smile;
+    st.smile = st.isPresent ? lerp(st.smile, smile, smoothingFactor(dt, 0.2)) : smile;
+    st.isPresent = true;
     st.lastSeen = time;
     this.updateContactDecision();
+    this.updateSmileDecision();
+  }
+
+  private biggest(faces: readonly FaceObservation[]): FaceObservation | null {
+    const usable = faces.filter((f) => f.confidence >= MIN_CONFIDENCE && f.size > 0);
+    return usable.reduce<FaceObservation | null>((best, f) => (!best || f.size > best.size ? f : best), null);
+  }
+
+  private updateSmileDecision(): void {
+    const st = this.state;
+    if (st.isSmiling) {
+      if (st.smile < SMILE_OFF) st.isSmiling = false;
+    } else if (st.smile > SMILE_ON) {
+      st.isSmiling = true;
+    }
   }
 
   /** Call regularly, so absence is detected even when no camera frames arrive. */
@@ -139,7 +184,9 @@ export class AttentionEstimator {
     // Keep the last position during the grace period, but let eye contact fade.
     const k = smoothingFactor(dt, this.settings.contactSmoothing * 2);
     this.state.contactScore = lerp(this.state.contactScore, 0, k);
+    this.state.smile = lerp(this.state.smile, 0, k);
     this.updateContactDecision();
+    this.updateSmileDecision();
     this.tick(now);
   }
 

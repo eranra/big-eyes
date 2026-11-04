@@ -19,7 +19,7 @@
 ---
 
 Leave your computer alone for 30 seconds, and a pair of big, curious eyes fades in over your screen.
-They **find you with the camera and follow your head**. Look into them and they **smile** 😊.
+They **find you with the camera and follow your head**. Look into them and they **smile** 😊 — smile at them and they **smile back**.
 Look away and they get **bored** 😒. Walk away and they **fall asleep** 😴. Move your mouse to them, or press any key, and they're gone.
 
 It's a tiny bit of life on your desk. Fun for you, your kids, your coworkers, and anyone who walks by.
@@ -72,7 +72,8 @@ On Debian or Ubuntu you can also install the `.deb`: `sudo apt install ./big-eye
 | | |
 |---|---|
 | ![Curious](docs/images/curious.png) | **Curious.** The eyes appear after 30 seconds without keyboard or mouse use. They find you and follow your head, and the whole pair drifts a little toward you. |
-| ![Happy](docs/images/happy.png) | **Happy.** Look straight into them and they smile, with rosy cheeks. Smile back and they smile even more. |
+| ![Happy](docs/images/happy.png) | **Happy.** Look straight into them and they smile, with rosy cheeks. |
+| ![Smiling back](docs/images/delighted.png) | **Smiling back.** Smile at them and they smile right back — a big, open smile with a happy bounce. |
 | ![Bored](docs/images/bored.png) | **Bored.** Look away for a few seconds and their lids get heavy, they roll their eyes, and they look somewhere else too. |
 | ![Sleeping](docs/images/sleeping.png) | **Sleeping.** Nobody there? They doze off. When someone shows up, they wake up surprised. |
 
@@ -99,16 +100,17 @@ Click the 👀 icon for quick choices, or open **Settings…** for everything, w
 | Setting | Choices | Default |
 |---|---|---|
 | **Look** | Classic, Cartoon, Robot, Cat, Spooky — or mix your own | Classic |
-| **Colors** | Iris, eye white, eyelids, eyebrows, lashes, glow | Blue eyes |
+| **Colors** | Iris, eye white, eyelids, eyebrows, lashes, glow, lips | Blue eyes |
 | **Shape** | Round, tall or wide eyes; detailed, simple or glowing iris; round or cat pupils; size; spacing | Round |
-| **Details** | Eyebrows, lashes, rosy cheeks — each on or off | All on |
+| **Details** | Eyebrows, lashes, rosy cheeks, mouth — each on or off | All on |
 | **Eye size** | Very Small, Small, Medium, Large, Huge, or any size | Medium |
 | **Position** | Center, top left, top right, bottom left, bottom right | Center |
 | **Blinking** | How often (never … very often) and how fast (slow and sleepy … quick) | Normal |
 | **Closing** | Mouse onto the eyes, any mouse movement, or never; and *look into the eyes to close them* (1–10 s) | Mouse onto the eyes; look-to-close off |
 | **Show after** | 15 seconds … 10 minutes, or any time | 30 seconds |
 | **Screens** | Built-in screen, main screen, all screens, or the ones you pick | Built-in screen |
-| **Camera** | Built-in camera, system default, or any connected camera | Built-in camera |
+| **Cameras** | Built-in camera, system default, all cameras, or the ones you pick. With several cameras, the first is the main one: the eyes follow what it sees, and the others notice you when it can't | Built-in camera |
+| **Smiles** | Smile back when you smile at them; show or hide the mouth; lip color | On |
 | **Text** | Show a word under the eyes when you look at them ("Welcome") and when you look away ("Bored") — and write your own words | Off |
 | **Background** | See-through … dark | Light |
 | **Calibrate** | Teach the eyes how *you* look at them, for your camera position | Built-in values |
@@ -142,7 +144,8 @@ Details: [docs/privacy.md](docs/privacy.md).
 | The eyes close too easily | Menu → **Closing** → **Mouse movement never closes them** |
 | The eyes never appear | Check that **Pause** is off. On macOS, a video tab or call can hold them back (**Don't Show During Video**). |
 | "I can't see you" | Allow camera access: macOS **System Settings → Privacy & Security → Camera**; Windows **Settings → Privacy → Camera**. |
-| Wrong camera or screen | Menu → **Camera** / **Screens** |
+| Wrong camera or screen | Menu → **Cameras** / **Screens** |
+| The eyes don't smile back | Smile clearly while looking at them. Check **Smile Back When You Smile** in the menu |
 
 More help: [docs/troubleshooting.md](docs/troubleshooting.md).
 

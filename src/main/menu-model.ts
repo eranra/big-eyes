@@ -66,41 +66,35 @@ function presetMenu<T>(
 }
 
 export function cameraMenu(settings: Settings, cameras: readonly CameraInfo[]): MenuNode {
-  const automatic = settings.cameraId === null && settings.cameraLabel === null;
-  const known = cameras.some((c) => c.deviceId === settings.cameraId || c.label === settings.cameraLabel);
+  const choice = settings.cameras;
+  const selected = choice.mode === 'selected' ? choice.cameras : [];
   const items: MenuNode[] = [
-    {
-      label: 'Built-in Camera',
-      type: 'radio',
-      checked: automatic && settings.cameraKind === 'builtin',
-      action: patch({ cameraKind: 'builtin', cameraId: null, cameraLabel: null }),
-    },
-    {
-      label: 'System Default',
-      type: 'radio',
-      checked: automatic && settings.cameraKind === 'default',
-      action: patch({ cameraKind: 'default', cameraId: null, cameraLabel: null }),
-    },
+    { label: 'Built-in Camera', type: 'radio', checked: choice.mode === 'builtin', action: patch({ cameras: { mode: 'builtin' } }) },
+    { label: 'System Default', type: 'radio', checked: choice.mode === 'default', action: patch({ cameras: { mode: 'default' } }) },
+    { label: 'All Cameras', type: 'radio', checked: choice.mode === 'all', action: patch({ cameras: { mode: 'all' } }) },
   ];
   if (cameras.length) items.push(separator);
   for (const camera of cameras) {
+    const index = selected.findIndex((c) => (c.id && c.id === camera.deviceId) || (c.label && c.label === camera.label));
+    const isOn = index >= 0;
+    // Toggling a camera switches to "selected" mode. The last selected camera cannot be turned off.
+    const next = isOn ? selected.filter((_, i) => i !== index) : [...selected, { id: camera.deviceId, label: camera.label }];
+    const main = isOn && index === 0 && selected.length > 1 ? ' — main' : '';
     items.push({
-      label: `${camera.label || 'Camera'}${isBuiltInCamera(camera.label) ? ' (built-in)' : ''}`,
-      type: 'radio',
-      checked: !automatic && (camera.deviceId === settings.cameraId || camera.label === settings.cameraLabel),
-      action: patch({ cameraId: camera.deviceId, cameraLabel: camera.label }),
+      label: `${camera.label || 'Camera'}${isBuiltInCamera(camera.label) ? ' (built-in)' : ''}${main}`,
+      type: 'checkbox',
+      checked: isOn,
+      enabled: !(isOn && selected.length === 1),
+      action: patch({ cameras: { mode: 'selected', cameras: next } }),
     });
   }
-  if (!automatic && !known) {
-    items.push({
-      label: `${settings.cameraLabel ?? 'Saved camera'} (not connected)`,
-      type: 'radio',
-      checked: true,
-      enabled: false,
-    });
+  for (const saved of selected) {
+    if (!cameras.some((c) => (saved.id && c.deviceId === saved.id) || (saved.label && c.label === saved.label))) {
+      items.push({ label: `${saved.label || 'Saved camera'} (not connected)`, type: 'checkbox', checked: true, enabled: false });
+    }
   }
   items.push(separator, { label: 'Refresh Camera List', action: command('refreshCameras') });
-  return { label: 'Camera', type: 'submenu', submenu: items };
+  return { label: 'Cameras', type: 'submenu', submenu: items };
 }
 
 export function screensMenu(settings: Settings, displays: readonly DisplaySummary[]): MenuNode {
@@ -218,6 +212,18 @@ export function buildMenuModel(
     cameraMenu(settings, cameras),
     screensMenu(settings, displays),
     separator,
+    {
+      label: 'Smile Back When You Smile',
+      type: 'checkbox',
+      checked: settings.mood.smileBack,
+      action: patch({ mood: { smileBack: !settings.mood.smileBack } }),
+    },
+    {
+      label: 'Show Mouth',
+      type: 'checkbox',
+      checked: settings.look.showMouth,
+      action: patch({ look: { showMouth: !settings.look.showMouth } }),
+    },
     toggle('Show Text (Welcome / Bored)', settings.showCaptions, 'showCaptions'),
     toggle('Mirror Camera', settings.mirrorCamera, 'mirrorCamera'),
   ];

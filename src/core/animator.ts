@@ -39,11 +39,21 @@ export interface EyePose {
   closeProgress: number;
   /** Extra closure of the right eye for a wink, 0..1. */
   wink: number;
+  /** Mouth curve: -1 = frown, 0 = flat, 1 = big smile. */
+  mouthSmile: number;
+  /** How open the mouth is, 0 = closed line, 1 = wide open (laugh or "o"). */
+  mouthOpen: number;
+  /** Mouth width, relative. 1 = normal. */
+  mouthWidth: number;
+  /** Mouth opacity, 0..1 (0 when the mouth is turned off). */
+  mouthOpacity: number;
   mood: Mood;
 }
 
 /** Target look of each mood. The animator moves toward these values with springs. */
 export interface MoodShape {
+  /** Mouth curve, opening and width for this mood. */
+  mouth: { smile: number; open: number; width: number };
   upperLid: number;
   smile: number;
   lidTilt: number;
@@ -54,11 +64,30 @@ export interface MoodShape {
 }
 
 export const MOOD_SHAPES: Readonly<Record<Mood, MoodShape>> = {
-  sleeping: { upperLid: 0.93, smile: 0.05, lidTilt: 0, pupilSize: 0.9, scale: 0.94, browLift: -0.35, browTilt: 0.05 },
-  surprised: { upperLid: 0, smile: 0, lidTilt: 0, pupilSize: 0.72, scale: 1.08, browLift: 1, browTilt: -0.05 },
-  curious: { upperLid: 0.12, smile: 0, lidTilt: 0, pupilSize: 1, scale: 1, browLift: 0.15, browTilt: 0 },
-  happy: { upperLid: 0.18, smile: 0.62, lidTilt: -0.06, pupilSize: 1.22, scale: 1.04, browLift: 0.55, browTilt: -0.12 },
-  bored: { upperLid: 0.5, smile: 0.08, lidTilt: 0.16, pupilSize: 0.92, scale: 0.98, browLift: -0.45, browTilt: 0.2 },
+  sleeping: {
+    upperLid: 0.93, smile: 0.05, lidTilt: 0, pupilSize: 0.9, scale: 0.94, browLift: -0.35, browTilt: 0.05,
+    mouth: { smile: 0.1, open: 0.12, width: 0.55 },
+  },
+  surprised: {
+    upperLid: 0, smile: 0, lidTilt: 0, pupilSize: 0.72, scale: 1.08, browLift: 1, browTilt: -0.05,
+    mouth: { smile: 0, open: 0.75, width: 0.42 },
+  },
+  curious: {
+    upperLid: 0.12, smile: 0, lidTilt: 0, pupilSize: 1, scale: 1, browLift: 0.15, browTilt: 0,
+    mouth: { smile: 0.15, open: 0, width: 0.7 },
+  },
+  happy: {
+    upperLid: 0.18, smile: 0.62, lidTilt: -0.06, pupilSize: 1.22, scale: 1.04, browLift: 0.55, browTilt: -0.12,
+    mouth: { smile: 0.55, open: 0, width: 0.9 },
+  },
+  delighted: {
+    upperLid: 0.3, smile: 0.95, lidTilt: -0.08, pupilSize: 1.3, scale: 1.07, browLift: 0.75, browTilt: -0.16,
+    mouth: { smile: 1, open: 0.55, width: 1.15 },
+  },
+  bored: {
+    upperLid: 0.5, smile: 0.08, lidTilt: 0.16, pupilSize: 0.92, scale: 0.98, browLift: -0.45, browTilt: 0.2,
+    mouth: { smile: -0.35, open: 0, width: 0.65 },
+  },
 };
 
 /**
@@ -98,6 +127,10 @@ export class EyeAnimator {
   private readonly browLift = new Spring(0, 0.4, 0.65);
   private readonly browTilt = new Spring(0, 0.5, 0.85);
 
+  private readonly mouthSmile = new Spring(0.15, 0.32, 0.6);
+  private readonly mouthOpen = new Spring(0, 0.22, 0.65);
+  private readonly mouthWidth = new Spring(0.7, 0.35, 0.7);
+  private readonly mouthAlpha = new Spring(1, 0.4, 1);
   private readonly closeRing = new Spring(0, 0.25, 1);
   private readonly winkSpring = new Spring(0, 0.12, 0.8);
   /** Time eye contact started, for look-to-close. */
@@ -191,6 +224,13 @@ export class EyeAnimator {
     this.convergence.target = person.isPresent ? clamp((person.size - 0.2) * 2, 0, 1) : 0;
     this.browLift.target = shape.browLift;
     this.browTilt.target = shape.browTilt;
+    // Mouth: follows the mood. When delighted it mirrors how much the person smiles, with a small "talking" wobble.
+    const delighted = mood === 'delighted';
+    const mirror = delighted ? clamp(person.smile, 0, 1) : 0;
+    this.mouthSmile.target = shape.mouth.smile;
+    this.mouthOpen.target = shape.mouth.open * (delighted ? 0.6 + 0.4 * mirror : 1) + (delighted ? Math.sin(now * 7.3) * 0.05 : 0);
+    this.mouthWidth.target = shape.mouth.width * (delighted ? 0.9 + 0.15 * mirror : 1);
+    this.mouthAlpha.target = this.settings.look.showMouth ? 1 : 0;
     for (const s of [
       this.upperLid,
       this.smile,
@@ -200,6 +240,10 @@ export class EyeAnimator {
       this.convergence,
       this.browLift,
       this.browTilt,
+      this.mouthSmile,
+      this.mouthOpen,
+      this.mouthWidth,
+      this.mouthAlpha,
     ]) {
       s.step(dt);
     }
@@ -210,15 +254,15 @@ export class EyeAnimator {
     this.blinks.rate = this.settings.blink.rate;
     this.blinks.speed = this.settings.blink.speed;
     this.blinks.slowness = mood === 'bored' ? 1.7 : mood === 'sleeping' ? 2.5 : 1;
-    this.blinks.intervalScale = mood === 'happy' ? 0.8 : mood === 'bored' ? 1.4 : 1;
+    this.blinks.intervalScale = mood === 'happy' || mood === 'delighted' ? 0.8 : mood === 'bored' ? 1.4 : 1;
     this.blinks.enabled = mood !== 'sleeping';
     const blink = this.blinks.closure(now);
 
-    if (mood === 'happy') this.captionText = this.settings.welcomeText;
+    if (mood === 'happy' || mood === 'delighted') this.captionText = this.settings.welcomeText;
     else if (mood === 'bored') this.captionText = this.settings.boredText;
     if (this.messageOverride !== null) this.captionText = this.messageOverride;
     const captionWanted =
-      this.messageOverride !== null || (this.settings.showCaptions && (mood === 'happy' || mood === 'bored'));
+      this.messageOverride !== null || (this.settings.showCaptions && (mood === 'happy' || mood === 'delighted' || mood === 'bored'));
     this.caption.target = captionWanted ? 1 : 0;
     this.caption.step(dt);
     this.sleepBubble.target = mood === 'sleeping' ? 1 : 0;
@@ -250,6 +294,10 @@ export class EyeAnimator {
       sleepOpacity: clamp(this.sleepBubble.value, 0, 1),
       closeProgress: clamp(this.closeRing.value, 0, 1),
       wink: clamp(this.winkSpring.value, 0, 1),
+      mouthSmile: clamp(this.mouthSmile.value, -1, 1.2),
+      mouthOpen: clamp(this.mouthOpen.value, 0, 1),
+      mouthWidth: Math.max(this.mouthWidth.value, 0.2),
+      mouthOpacity: clamp(this.mouthAlpha.value, 0, 1),
       mood: this.moods.mood,
     };
   }
@@ -294,6 +342,11 @@ export class EyeAnimator {
         this.scaleSpring.velocity += 0.6; // a small bounce of joy
         this.browLift.velocity += 3;
         break;
+      case 'delighted':
+        this.scaleSpring.velocity += 1.1; // a bigger bounce
+        this.browLift.velocity += 4;
+        this.mouthWidth.velocity += 2;
+        break;
       case 'bored':
       case 'curious':
         if (this.rng.next() < 0.7) this.blinks.trigger(now);
@@ -311,7 +364,7 @@ export class EyeAnimator {
       const target = clampLength(person.position, 1);
       if (now >= this.nextSaccadeAt) {
         // Micro-saccade: a tiny jump around the face. Smaller when making eye contact.
-        this.fixation = add(target, scale(this.rng.inUnitDisk(), mood === 'happy' ? 0.02 : 0.05));
+        this.fixation = add(target, scale(this.rng.inUnitDisk(), mood === 'happy' || mood === 'delighted' ? 0.02 : 0.05));
         this.nextSaccadeAt = now + this.rng.range(0.35, 1.1);
       } else {
         // Smooth pursuit: follow head movement between micro-saccades.
@@ -365,11 +418,15 @@ export function staticPose(mood: Mood, settings: Settings = defaultSettings()): 
     browLift: s.browLift,
     browTilt: s.browTilt,
     squash: 0,
-    caption: mood === 'happy' ? settings.welcomeText : mood === 'bored' ? settings.boredText : '',
-    captionOpacity: mood === 'happy' || mood === 'bored' ? 1 : 0,
+    caption: mood === 'happy' || mood === 'delighted' ? settings.welcomeText : mood === 'bored' ? settings.boredText : '',
+    captionOpacity: settings.showCaptions && (mood === 'happy' || mood === 'delighted' || mood === 'bored') ? 1 : 0,
     sleepOpacity: mood === 'sleeping' ? 1 : 0,
     closeProgress: 0,
     wink: 0,
+    mouthSmile: s.mouth.smile,
+    mouthOpen: s.mouth.open,
+    mouthWidth: s.mouth.width,
+    mouthOpacity: settings.look.showMouth ? 1 : 0,
     mood,
   };
 }
