@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' blob: mediastream:"
+    />
+    <title>Big Eyes Settings</title>
+    <link rel="stylesheet" href="settings.css" />
+  </head>
+  <body>
+    <header>
+      <canvas id="preview" aria-label="Preview of the eyes"></canvas>
+      <div class="mood-buttons" role="group" aria-label="Preview mood">
+        <button data-mood="curious" class="on">Curious</button>
+        <button data-mood="happy">Happy</button>
+        <button data-mood="bored">Bored</button>
+        <button data-mood="surprised">Surprised</button>
+        <button data-mood="sleeping">Sleeping</button>
+      </div>
+    </header>
+
+    <main>
+      <section>
+        <h2>Look</h2>
+        <div class="row">
+          <span>Theme</span>
+          <span class="themes" id="themes"></span>
+        </div>
+        <div class="row">
+          <span>Position</span>
+          <span class="positions" id="positions" role="radiogroup" aria-label="Position on the screen"></span>
+        </div>
+        <label class="row">
+          <span>Eye size</span>
+          <input id="eyeSize" type="range" min="0.2" max="2.5" step="0.05" />
+          <output for="eyeSize"></output>
+        </label>
+        <label class="row">
+          <span>Eye color</span>
+          <span class="swatches" id="irisPresets"></span>
+          <input id="irisColor" type="color" />
+        </label>
+        <label class="row">
+          <span>Iris style</span>
+          <select id="irisStyle"></select>
+        </label>
+        <label class="row">
+          <span>Eye shape</span>
+          <select id="eyeShape"></select>
+        </label>
+        <label class="row">
+          <span>Iris size</span>
+          <input id="irisSize" type="range" min="0.6" max="1.4" step="0.05" />
+          <output for="irisSize"></output>
+        </label>
+        <label class="row">
+          <span>Pupil shape</span>
+          <select id="pupilShape"></select>
+        </label>
+        <label class="row">
+          <span>Pupil size</span>
+          <input id="pupilSize" type="range" min="0.5" max="1.6" step="0.05" />
+          <output for="pupilSize"></output>
+        </label>
+        <label class="row">
+          <span>Space between eyes</span>
+          <input id="spacing" type="range" min="0.8" max="1.5" step="0.05" />
+          <output for="spacing"></output>
+        </label>
+        <div class="row colors">
+          <span>Colors</span>
+          <span class="color-grid">
+            <label><input id="scleraColor" type="color" /> Eye white</label>
+            <label><input id="lidColor" type="color" /> Eyelids</label>
+            <label><input id="browColor" type="color" /> Eyebrows</label>
+            <label><input id="lashColor" type="color" /> Lashes</label>
+            <label><input id="glowColor" type="color" /> Glow</label>
+          </span>
+        </div>
+        <label class="row">
+          <span>Glow</span>
+          <input id="glowStrength" type="range" min="0" max="1" step="0.05" />
+          <output for="glowStrength"></output>
+        </label>
+        <label class="row check"><input id="showBrows" type="checkbox" /><span>Eyebrows</span></label>
+        <label class="row check"><input id="showLashes" type="checkbox" /><span>Lashes</span></label>
+        <label class="row check"><input id="showBlush" type="checkbox" /><span>Pink cheeks when smiling</span></label>
+        <label class="row">
+          <span>Background</span>
+          <input id="backgroundDim" type="range" min="0" max="0.95" step="0.05" />
+          <output for="backgroundDim"></output>
+        </label>
+      </section>
+
+      <section>
+        <h2>Blinking</h2>
+        <label class="row">
+          <span>How often</span>
+          <input id="blinkRate" type="range" min="0" max="3" step="0.1" />
+          <output for="blinkRate"></output>
+        </label>
+        <label class="row">
+          <span>How fast</span>
+          <input id="blinkSpeed" type="range" min="0.3" max="2.5" step="0.1" />
+          <output for="blinkSpeed"></output>
+        </label>
+      </section>
+
+      <section>
+        <h2>Closing</h2>
+        <p class="hint">A key press or a click always closes the eyes.</p>
+        <div id="mouseRules"></div>
+        <label class="row check">
+          <input id="lookToClose" type="checkbox" />
+          <span>Looking into the eyes closes them (they wink goodbye)</span>
+        </label>
+        <label class="row">
+          <span>Look time</span>
+          <input id="lookToCloseSeconds" type="range" min="0.5" max="10" step="0.5" />
+          <output for="lookToCloseSeconds"></output>
+        </label>
+      </section>
+
+      <section>
+        <h2>Text</h2>
+        <label class="row check">
+          <input id="showCaptions" type="checkbox" />
+          <span>Show text under the eyes</span>
+        </label>
+        <label class="row">
+          <span>When you look at them</span>
+          <input id="welcomeText" type="text" maxlength="40" />
+        </label>
+        <label class="row">
+          <span>When you look away</span>
+          <input id="boredText" type="text" maxlength="40" />
+        </label>
+      </section>
+
+      <section>
+        <h2>When</h2>
+        <label class="row">
+          <span>Show after</span>
+          <input id="idleTimeout" type="range" min="5" max="600" step="5" />
+          <output for="idleTimeout"></output>
+        </label>
+        <label class="row check mac-only">
+          <input id="respectVideoPlayback" type="checkbox" />
+          <span>Don't show while a video or presentation is playing</span>
+        </label>
+        <label class="row check">
+          <input id="openAtLogin" type="checkbox" />
+          <span>Open at login</span>
+        </label>
+        <label class="row check">
+          <input id="paused" type="checkbox" />
+          <span>Paused</span>
+        </label>
+      </section>
+
+      <section>
+        <h2>Camera</h2>
+        <label class="row">
+          <span>Camera</span>
+          <select id="cameraId"></select>
+          <button id="refreshCameras" class="small" title="Refresh the camera list">↻</button>
+        </label>
+        <video id="cameraTest" muted playsinline hidden></video>
+        <label class="row check">
+          <input id="mirrorCamera" type="checkbox" />
+          <span>Mirror camera (use if the eyes look the wrong way)</span>
+        </label>
+        <div class="row buttons">
+          <button id="testCamera">Test camera</button>
+          <button id="calibrate">Calibrate eye contact…</button>
+        </div>
+      </section>
+
+      <section>
+        <h2>Screens</h2>
+        <div id="screens"></div>
+      </section>
+
+      <section>
+        <h2>Advanced</h2>
+        <label class="row">
+          <span>Eye contact strictness</span>
+          <input id="strictness" type="range" min="0.5" max="2" step="0.05" />
+          <output for="strictness"></output>
+        </label>
+        <label class="row">
+          <span>Bored after (s)</span>
+          <input id="awayToBored" type="range" min="0.5" max="15" step="0.5" />
+          <output for="awayToBored"></output>
+        </label>
+        <label class="row">
+          <span>Sleep after (s)</span>
+          <input id="absentToSleep" type="range" min="2" max="120" step="1" />
+          <output for="absentToSleep"></output>
+        </label>
+        <label class="row check">
+          <input id="showDebugInfo" type="checkbox" />
+          <span>Show tracking numbers on the overlay</span>
+        </label>
+      </section>
+    </main>
+
+    <footer>
+      <span id="status" role="status"></span>
+      <button id="reset" class="quiet">Reset all</button>
+      <button id="previewNow" class="primary">Show eyes now</button>
+    </footer>
+    <script src="settings.js"></script>
+  </body>
+</html>
