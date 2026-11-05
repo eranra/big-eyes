@@ -15,7 +15,9 @@ bug reports, ideas, new eye themes, translations of the texts, documentation, an
 
 ## Development setup
 
-You need [Node.js](https://nodejs.org/) 20 or newer and git.
+You need [Node.js](https://nodejs.org/) 20 or newer and git. On macOS, the Xcode Command Line Tools
+(`xcode-select --install`) build the small native idle helper; without them the app still works with a simpler idle
+counter.
 
 ```sh
 git clone https://github.com/eranra/big-eyes.git
