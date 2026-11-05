@@ -22,6 +22,7 @@ import { pathToFileURL } from 'node:url';
 import { IdleMonitor, pointInRects } from '../core/idle';
 import { PresenceCheck } from '../core/presence';
 import { ActivityClock } from '../core/activity';
+import { InputKinds$ } from './input-kinds';
 import type { FaceObservation } from '../core/face';
 import { IPC, type CameraInfo, type DisplaySummary, type FacesMessage, type OverlayRole } from '../core/ipc';
 import { blurActive, blurOnlyDisplays, screenSaverSeconds, selectDisplays, type GazeReference, type Settings } from '../core/settings';
@@ -110,6 +111,8 @@ const idle = new IdleMonitor(60);
 const presence = new PresenceCheck();
 /** Idle clock that ignores tiny mouse jitter (see src/core/activity.ts). */
 const activity = new ActivityClock(performance.now() / 1000);
+/** macOS: separate counters for keys, clicks, scrolling and mouse moves (null elsewhere). */
+let inputKinds: InputKinds$ | null = null;
 /** Id of the power save blocker that keeps the screen saver away ("replace" mode), or null. */
 let screenSaverBlocker: number | null = null;
 let screenSaverActive = false;
@@ -380,7 +383,8 @@ function hideOverlays(): void {
 function show(): void {
   presence.reset();
   const now = nowSeconds();
-  if (idle.forceShow(now, activity.sample(now, powerMonitor.getSystemIdleTime(), screen.getCursorScreenPoint()))) showOverlays();
+  const sample = activity.sample(now, powerMonitor.getSystemIdleTime(), screen.getCursorScreenPoint(), inputKinds?.latest());
+  if (idle.forceShow(now, sample)) showOverlays();
 }
 
 function hide(): void {
@@ -495,10 +499,11 @@ async function checkIdle(): Promise<void> {
     const cursor = screen.getCursorScreenPoint();
     const systemIdle = powerMonitor.getSystemIdleTime();
     // Filtered idle time: tiny mouse jitter does not count as input.
-    const idleSeconds = activity.sample(now, systemIdle, cursor);
+    const idleSeconds = activity.sample(now, systemIdle, cursor, inputKinds?.latest());
     if (FORCE_DEBUG && now - lastActivityLog >= 10) {
       lastActivityLog = now;
-      debugLog(`activity: idle=${idleSeconds.toFixed(1)}s system=${systemIdle}s`);
+      const k = inputKinds?.latest();
+      debugLog(`activity: idle=${idleSeconds.toFixed(1)}s system=${systemIdle}s` + (k ? ` key=${k.key.toFixed(1)} click=${k.click.toFixed(1)} scroll=${k.scroll.toFixed(1)} move=${k.move.toFixed(1)}` : ' (combined)'));
     }
     let pointerMoved = false;
     let pointerInEyes = false;
@@ -579,7 +584,11 @@ async function checkIdle(): Promise<void> {
     updateBlur(idleSeconds);
     if (STAY && idle.isShowing) return;
     const event = idle.update({ idleSeconds, now, blocked, pointerMoved, pointerInEyes, mouseRule: s.mouseRule });
-    if (event) eventLog(`idle event: ${event}${event === 'hide' ? ` (${idle.lastHideReason})` : ''} idle=${idleSeconds.toFixed(1)}s system=${systemIdle}s`);
+    if (event) {
+      const k = inputKinds?.latest();
+      const kinds = k ? ` key=${k.key.toFixed(1)} click=${k.click.toFixed(1)} scroll=${k.scroll.toFixed(1)} move=${k.move.toFixed(1)}` : '';
+      eventLog(`idle event: ${event}${event === 'hide' ? ` (${idle.lastHideReason})` : ''} idle=${idleSeconds.toFixed(1)}s system=${systemIdle}s${kinds}`);
+    }
     if (event === 'show') showOverlays();
     if (event === 'hide') {
       presence.reset();
@@ -958,6 +967,8 @@ void app.whenReady().then(async () => {
     if (process.platform !== 'darwin') tray?.popUpContextMenu();
   });
   eventLog(`Big Eyes ${app.getVersion()} started (${process.platform} ${process.arch}); log: ${logFile()}`);
+  inputKinds = new InputKinds$(eventLog);
+  inputKinds.start();
   updater = new Updater({
     autoCheckEnabled: () => store.get().checkForUpdates,
     lastAnnounced: () => store.get().lastAnnouncedVersion,
@@ -1008,5 +1019,6 @@ void app.whenReady().then(async () => {
 });
 
 app.on('before-quit', () => {
+  inputKinds?.stop();
   void store?.flush();
 });

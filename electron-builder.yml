@@ -7,6 +7,7 @@ directories:
   buildResources: assets
 files:
   - build/**/*
+  - '!build/native/**'
   - '!build/**/*.map'
   - assets/icons/**/*
   - package.json
@@ -26,6 +27,10 @@ publish:
 
 mac:
   category: public.app-category.entertainment
+  # The idle helper (see native/macos) is a separate program; it lives next to the app's resources.
+  extraResources:
+    - from: build/native/idle-helper
+      to: idle-helper
   target:
     - target: dmg
       arch: [arm64, x64]

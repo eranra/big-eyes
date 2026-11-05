@@ -59,4 +59,5 @@ try {
 }
 await mkdir(join(renderer, 'models'), { recursive: true });
 await cp(model, join(renderer, 'models/face_landmarker.task'));
+await import('./build-native.mjs');
 console.log('Built into ./build');

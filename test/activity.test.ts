@@ -14,7 +14,7 @@ function run(clock: ActivityClock, from: number, to: number, step: (t: number) =
 describe('ActivityClock', () => {
   it('nothing happens: idle time grows', () => {
     const c = new ActivityClock(0);
-    const idle = run(c, 0, 30, (t) => [Math.floor(t), { x: 500, y: 500 }]);
+    const idle = run(c, 0, 30, (t) => [Math.floor(t) + 5, { x: 500, y: 500 }]);
     expect(idle).toBeGreaterThan(29);
   });
 

@@ -52,10 +52,16 @@ Each overlay runs its own animator, so all screens show the same behavior.
 
 ## Idle time and mouse jitter
 
-`ActivityClock` (`src/core/activity.ts`) keeps Big Eyes' own idle time. The system idle counter resets on any input
-event, including 1-3 pixel wobbles from some wireless mice. The clock samples the pointer 10 times per second:
-more than 8 pixels of travel within 2 seconds is mouse use; a system reset without any pointer movement is a key
-press or click; anything else is jitter and is ignored.
+`ActivityClock` (`src/core/activity.ts`) keeps Big Eyes' own idle time, sampled 10 times per second. Keys, clicks
+and scrolling always count as input. Mouse movement counts only when the pointer travels more than 8 pixels within
+2 seconds, so the 1-3 pixel wobbles some wireless mice send do not keep the eyes away.
+
+- **macOS:** `native/macos/idle-helper.swift` (built at `npm run build` into a universal binary and shipped in the
+  app's Resources) prints the seconds since the last key, click, scroll and mouse move, from
+  `CGEventSourceSecondsSinceLastEventType`. It reads only these counters, no event contents, and needs no
+  permissions. `src/main/input-kinds.ts` runs it once and reads its lines.
+- **Windows, Linux, or no helper:** only the combined system idle time exists. Input always counts, except an input
+  moment that starts with a small pointer move after at least 2 quiet seconds (a lone wobble).
 
 ## Waiting while someone looks at the screen
 

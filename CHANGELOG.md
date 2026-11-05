@@ -5,6 +5,17 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.4] - 2026-11-05
+
+### Fixed
+
+- **The eyes could open while you were typing.** Big Eyes counted only the first key of a typing run as input, so
+  after about 15-20 seconds of steady typing it thought you were idle. Typing while a hand rested on the mouse
+  could also be mistaken for mouse jitter.
+  - macOS: a tiny helper now reads separate counters for keys, clicks, scrolling and mouse moves. Keys, clicks and
+    scrolling always count; only mouse movement goes through the jitter filter.
+  - Windows and Linux: input always counts, except single small wobbles of the mouse after a quiet moment.
+
 ## [0.3.3] - 2026-11-04
 
 ### Fixed
