@@ -76,9 +76,12 @@ describe('PresenceCheck uses the eye contact process', () => {
     expect(p.result(45)).toBe('nobody');
   });
 
-  it('a side camera never counts as looking at the screen', () => {
+  it('a second, uncalibrated camera never counts as looking at the screen', () => {
     const p = new PresenceCheck(timing);
-    p.start(0, attention);
+    p.start(0, attention, false, [], [
+      { index: 0, label: 'MacBook Pro Camera', id: 'a' },
+      { index: 1, label: 'HD Pro Webcam C920', id: 'b' },
+    ]);
     expect(feed(p, () => [{ ...atScreen(), camera: 1 }], 0.2, 6)).toBe('nobody');
   });
 

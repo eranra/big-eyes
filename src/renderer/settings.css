@@ -270,3 +270,20 @@ body:not(.mac) .mac-only {
   gap: 10px;
   min-height: 30px;
 }
+
+#calibrations .cal {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+}
+#calibrations .cal span:first-child {
+  flex: 1;
+}
+#calibrations .state {
+  color: var(--muted);
+  font-size: 12px;
+}
+#calibrations .state.ok {
+  color: #b9f0a8;
+}

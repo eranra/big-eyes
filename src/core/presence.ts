@@ -4,14 +4,13 @@
  * When the idle time is reached, the app does not show the eyes at once. It first opens the camera for
  * a short check. If a person is looking at the screen, the eyes wait, and the app checks again later.
  *
- * "Looking at the screen" uses exactly the same process as eye contact (and look-to-close): an
- * `AttentionEstimator` with the user's settings and calibration compares head angles and eye direction
- * with the reference, smooths the score, and decides with the same on/off thresholds. So looking at a
- * phone, a book, or another screen does not count.
+ * "Looking at the screen" uses exactly the same process as eye contact (and look-to-close): every camera works
+ * on its own, with its own calibration, and compares head angles and eye direction with its reference. If ANY
+ * camera sees eye contact, someone is looking. So looking at a phone, a book, or another screen does not count.
  */
-import { AttentionEstimator } from './attention';
+import { MultiCameraAttention, type OpenCamera } from './multicamera';
 import type { FaceObservation } from './face';
-import type { AttentionSettings } from './settings';
+import type { AttentionSettings, CameraCalibration } from './settings';
 
 export interface PresenceTiming {
   /** How long one camera check looks at frames (seconds), counted after the warm-up. */
@@ -45,8 +44,8 @@ export class PresenceCheck {
   private firstFrameAt: number | null = null;
   private sawWatcher = false;
   private nextCheckAt = 0;
-  /** A fresh eye contact estimator for each check, so an old score never carries over. */
-  private estimator: AttentionEstimator | null = null;
+  /** Fresh eye contact estimators (one per camera) for each check, so an old score never carries over. */
+  private estimator: MultiCameraAttention | null = null;
 
   constructor(readonly timing: PresenceTiming = DEFAULT_PRESENCE_TIMING) {}
 
@@ -55,19 +54,31 @@ export class PresenceCheck {
     return this.phase !== 'checking' && now >= this.nextCheckAt;
   }
 
-  start(now: number, attention: AttentionSettings, mirror = false): void {
+  start(
+    now: number,
+    attention: AttentionSettings,
+    mirror = false,
+    calibrations: readonly CameraCalibration[] = [],
+    cameras: readonly OpenCamera[] = [],
+  ): void {
     this.phase = 'checking';
     this.startedAt = now;
     this.firstFrameAt = null;
     this.sawWatcher = false;
-    this.estimator = new AttentionEstimator(attention, mirror);
+    this.estimator = new MultiCameraAttention(attention, mirror, calibrations);
+    this.estimator.setCameras(cameras);
+  }
+
+  /** Updates the list of open cameras during a check (their names arrive when they open). */
+  setCameras(cameras: readonly OpenCamera[]): void {
+    this.estimator?.setCameras(cameras);
   }
 
   /** Faces from one camera frame (an empty list is a frame with nobody in it). */
-  report(faces: readonly FaceObservation[], now: number): void {
+  report(faces: readonly FaceObservation[], now: number, cameras?: readonly number[]): void {
     if (this.phase !== 'checking' || !this.estimator) return;
     this.firstFrameAt ??= now;
-    this.estimator.ingest(faces, now);
+    this.estimator.ingest(faces, now, cameras);
     if (this.estimator.state.isMakingEyeContact) this.sawWatcher = true;
   }
 

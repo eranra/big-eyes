@@ -1,5 +1,6 @@
 import { EyeAnimator } from '../core/animator';
 import { chooseCameras, findCamera, isBuiltInCamera } from '../core/camera';
+import { findCalibration } from '../core/settings';
 import type { CameraInfo } from '../core/ipc';
 import type { BigEyesApi, DisplaySummary } from '../core/ipc';
 import type { Mood } from '../core/mood';
@@ -385,6 +386,7 @@ async function loadCameras(askPermission = false): Promise<void> {
   knownCameras = await FaceTracker.listCameras();
   api.sendCameras(knownCameras);
   renderCameras();
+  renderCalibrations();
 }
 
 function renderCameras(): void {
@@ -475,9 +477,46 @@ function stopCameraTest(): void {
 $('testCamera').addEventListener('click', () => (testStreams.length ? stopCameraTest() : void startCameraTest()));
 window.addEventListener('blur', stopCameraTest);
 
+/** One row per camera: its calibration status, "Calibrate" and "Forget". */
+function renderCalibrations(): void {
+  const box = $('calibrations');
+  box.replaceChildren();
+  const ids = chooseCameras(knownCameras, settings.cameras);
+  const used = ids.length ? knownCameras.filter((c) => ids.includes(c.deviceId)) : knownCameras.slice(0, 1);
+  for (const cam of used) {
+    const cal = findCalibration(settings.calibrations, { id: cam.deviceId, label: cam.label });
+    const row = document.createElement('div');
+    row.className = 'cal';
+    const name = document.createElement('span');
+    name.textContent = cam.label.replace(/\s*\([0-9a-f:]+\)\s*$/i, '');
+    const state = document.createElement('span');
+    state.className = `state${cal ? ' ok' : ''}`;
+    state.textContent = cal ? `calibrated${cal.date ? ` ${cal.date.slice(0, 10)}` : ''}` : 'not calibrated';
+    const go = document.createElement('button');
+    go.className = 'small';
+    go.textContent = 'Calibrate';
+    go.addEventListener('click', () => {
+      stopCameraTest();
+      setStatus(`Look straight into the eyes for 3 seconds (${name.textContent})…`);
+      api.calibrate(cam.label);
+    });
+    row.append(name, state, go);
+    if (cal) {
+      const forget = document.createElement('button');
+      forget.className = 'small quiet';
+      forget.textContent = 'Forget';
+      forget.addEventListener('click', () =>
+        save({ calibrations: settings.calibrations.filter((c) => c !== cal) }, 0),
+      );
+      row.append(forget);
+    }
+    box.append(row);
+  }
+}
+
 $('calibrate').addEventListener('click', () => {
   stopCameraTest();
-  setStatus('Look straight into the eyes for 3 seconds…');
+  setStatus('Look straight into the eyes. Each camera gets its own 3 seconds…');
   api.calibrate();
 });
 
@@ -556,6 +595,7 @@ function render(next: Settings): void {
   const camerasChanged = JSON.stringify(next.cameras) !== JSON.stringify(previousCameras);
   previousCameras = next.cameras;
   renderCameras();
+  renderCalibrations();
   if (camerasChanged && testStreams.length) void startCameraTest();
   renderScreens();
 }

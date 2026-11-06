@@ -27,8 +27,12 @@ let visible = false;
 let frameHandle = 0;
 const startTime = performance.now() / 1000;
 
-let calibrationEnd: number | null = null;
+/** Camera-by-camera calibration: the queue of cameras still to do, the one being recorded, and its samples. */
+let calibrationQueue: Array<{ index: number; label: string; id: string }> = [];
+let calibrating: { index: number; label: string; id: string; end: number; total: number; position: number } | null = null;
 let calibrationSamples: GazeReference[] = [];
+let calibrationCenters: Array<{ x: number; y: number }> = [];
+let calibrationFailed: string[] = [];
 let messageTimer = 0;
 
 // Guided test: instructions shown on screen; each log line names the current step.
@@ -49,8 +53,10 @@ function guidedStep(now: number): (typeof GUIDED_STEPS)[number] | null {
 const tracker = isTracker ? new FaceTracker(new URL('./', location.href).toString()) : null;
 if (tracker) {
   let lastLog = 0;
-  tracker.onFaces = (faces, time) => {
-    if (presenceActive && !visible) api.sendPresenceFaces({ faces });
+  tracker.onFaces = (faces, time, cameras) => {
+    const openCameras = tracker.openCameras;
+    animator.setCameras(openCameras);
+    if (presenceActive && !visible) api.sendPresenceFaces({ faces, cameras, openCameras });
     if (settings.showDebugInfo && time - lastLog > 1) {
       lastLog = time;
       const f = faces[0];
@@ -58,8 +64,8 @@ if (tracker) {
       const perCamera = [0, 1, 2].map((c) => faces.filter((x) => (x.camera ?? 0) === c).length).join('/');
       console.log((step ? `[${step.phase}] ` : '') + `faces=${perCamera} smile=${animator.person.smile.toFixed(2)}${animator.person.isSmiling ? '!' : ''} mood=${animator.mood}` + (f ? ` yaw=${f.yaw.toFixed(1)} pitch=${f.pitch.toFixed(1)} gaze=${f.gaze ? f.gaze.x.toFixed(2) + ',' + f.gaze.y.toFixed(2) : '-'} pos=${animator.person.position.x.toFixed(2)},${animator.person.position.y.toFixed(2)} contact=${animator.person.contactScore.toFixed(2)}` : ''));
     }
-    animator.ingest(faces, time);
-    api.sendFaces({ faces, time });
+    animator.ingest(faces, time, cameras);
+    api.sendFaces({ faces, time, cameras, openCameras });
   };
   tracker.onError = (message) => {
     if (presenceActive && !visible) {
@@ -70,7 +76,10 @@ if (tracker) {
     showMessage("I can't see you", 4000);
   };
 }
-api.onFaces(({ faces, time }) => animator.ingest(faces, time));
+api.onFaces(({ faces, time, cameras, openCameras }) => {
+  if (openCameras) animator.setCameras(openCameras);
+  animator.ingest(faces, time, cameras);
+});
 
 // Presence check: while the eyes are hidden, the main process can ask for a short camera look
 // ("is someone reading the screen?"). Only the tracker window does this.
@@ -138,7 +147,8 @@ function setVisible(next: boolean): void {
   } else {
     tracker?.stop();
     presenceActive = false;
-    calibrationEnd = null;
+    calibrating = null;
+    calibrationQueue = [];
     // Keep drawing during the fade-out, then stop.
     setTimeout(() => {
       if (!visible) cancelAnimationFrame(frameHandle);
@@ -152,46 +162,96 @@ function showMessage(text: string | null, durationMs = 0): void {
   if (text && durationMs > 0) messageTimer = window.setTimeout(() => (animator.messageOverride = null), durationMs);
 }
 
-function startCalibration(): void {
+/**
+ * Calibration, camera by camera. Each open camera gets its own step: "Look into my eyes - camera 1 of 2: <name>".
+ * Only that camera's frames are recorded, and the result is saved as that camera's own calibration.
+ * @param only calibrate only the camera with this name (from the menu); otherwise all open cameras, one by one.
+ */
+function startCalibration(only?: string): void {
+  if (!tracker) return;
+  const open = tracker.openCameras;
+  calibrationQueue = only ? open.filter((c) => c.label === only) : [...open];
+  calibrationFailed = [];
+  if (!calibrationQueue.length) {
+    // The cameras are still starting: try again in a moment.
+    if (performance.now() - calibrationRequestedAt < 8000) window.setTimeout(() => startCalibration(only), 500);
+    else showMessage("I can't see you", 2500);
+    return;
+  }
   animator.lookToCloseSuspended = true;
+  nextCalibrationStep(calibrationQueue.length);
+}
+let calibrationRequestedAt = 0;
+
+function shortName(label: string): string {
+  return label.replace(/\s*\([0-9a-f:]+\)\s*$/i, '');
+}
+
+function nextCalibrationStep(total: number): void {
+  const cam = calibrationQueue.shift();
+  if (!cam) {
+    window.setTimeout(() => (animator.lookToCloseSuspended = false), 3000);
+    const done = calibrationFailed.length === 0;
+    showMessage(done ? (total > 1 ? 'All cameras calibrated' : 'Got it') : `${calibrationFailed.join(', ')}: I couldn't see you`, 2500);
+    calibrating = null;
+    return;
+  }
   calibrationSamples = [];
-  calibrationEnd = performance.now() / 1000 + 3.2;
-  showMessage('Look into my eyes…');
+  calibrationCenters = [];
+  const position = total - calibrationQueue.length;
+  calibrating = { ...cam, end: performance.now() / 1000 + 3.2, total, position };
+  api.sendLog(`calibration: camera ${position} of ${total}: ${cam.label}`);
+  showMessage(total > 1 ? `Look into my eyes - camera ${position} of ${total}: ${shortName(cam.label)}` : 'Look into my eyes…');
 }
 
 function updateCalibration(now: number): void {
-  if (calibrationEnd === null) return;
-  // Skip the first second, so the person has time to look.
-  if (calibrationEnd - now < 2.2) {
-    const sample = animator.attention.calibrationSample();
-    if (sample) calibrationSamples.push(sample);
+  const step = calibrating;
+  if (!step) return;
+  // Skip the first second, so the person has time to look. Record ONLY this camera.
+  if (step.end - now < 2.2) {
+    const estimator = animator.attention.camera(step.index);
+    const sample = estimator.calibrationSample();
+    const face = estimator.lastObservation;
+    if (sample && face) {
+      calibrationSamples.push(sample);
+      calibrationCenters.push(face.center);
+    }
   }
-  if (now < calibrationEnd) return;
-  calibrationEnd = null;
-  // Give the person a moment after calibration before look-to-close can start.
-  window.setTimeout(() => (animator.lookToCloseSuspended = false), 3000);
+  if (now < step.end) return;
   const reference = averageReference(calibrationSamples);
-  if (!reference) {
-    showMessage("I can't see you", 2500);
-    return;
+  if (reference && isTracker) {
+    const n = calibrationCenters.length;
+    const faceCenter = {
+      x: calibrationCenters.reduce((a, c) => a + c.x, 0) / n,
+      y: calibrationCenters.reduce((a, c) => a + c.y, 0) / n,
+    };
+    api.sendCalibrated({ label: step.label, id: step.id, reference, faceCenter, date: new Date().toISOString() });
+  } else if (!reference) {
+    calibrationFailed.push(shortName(step.label));
+    api.sendLog(`calibration: ${step.label}: no face seen, not saved`);
   }
-  if (isTracker) api.sendCalibrated(reference);
-  showMessage('Got it', 1500);
+  nextCalibrationStep(step.total);
 }
 
 function debugText(): string {
   const p = animator.person;
-  const f = animator.attention.lastObservation;
   const n = (v: number, d = 2): string => v.toFixed(d);
   const lines = [
-    `mood: ${animator.mood}   present: ${p.isPresent}   contact: ${n(p.contactScore)} ${p.isMakingEyeContact ? 'YES' : 'no'}`,
+    `mood: ${animator.mood}   present: ${p.isPresent}   contact: ${p.isMakingEyeContact ? 'YES' : 'no'} ${n(p.contactSeconds, 1)}s   smile+contact: ${n(p.smileContactSeconds, 1)}s`,
     `position: ${n(p.position.x)}, ${n(p.position.y)}   size: ${n(p.size)}   smile: ${n(p.smile)}`,
   ];
-  if (f) {
-    const gaze = f.gaze ? `${n(f.gaze.x)}, ${n(f.gaze.y)}` : '-';
-    lines.push(`yaw: ${n(f.yaw, 1)}   pitch: ${n(f.pitch, 1)}   gaze: ${gaze}`);
+  // One line per camera: each one works on its own.
+  for (const cam of tracker?.openCameras ?? []) {
+    const e = animator.attention.camera(cam.index);
+    const s = e.state;
+    const f = e.lastObservation;
+    const cal = animator.attention.calibrationOf(cam.index) ? 'calibrated' : e.contactAllowed ? 'default' : 'NOT calibrated';
+    const angles = f ? `yaw ${n(f.yaw, 0)} pitch ${n(f.pitch, 0)}` : '-';
+    lines.push(
+      `${shortName(cam.label)} [${cal}]: ${s.isPresent ? 'face' : 'no face'}  contact ${n(s.contactScore)} ${s.isMakingEyeContact ? 'YES' : 'no'} ${n(s.contactSeconds, 1)}s  smile ${n(s.smile)}  ${angles}`,
+    );
   }
-  lines.push(`role: ${isTracker ? 'tracker' : 'mirror'}   cameras: ${tracker?.activeCameraLabels.join(' + ') || 'none'}`);
+  lines.push(`role: ${isTracker ? 'tracker' : 'mirror'}`);
   return lines.join('\n');
 }
 
@@ -233,6 +293,9 @@ function frame(): void {
 api.onBlur((on) => document.body.classList.toggle('blur', on));
 api.onSettings(applySettings);
 api.onVisibility(setVisible);
-api.onCalibrate(startCalibration);
+api.onCalibrate((camera) => {
+  calibrationRequestedAt = performance.now();
+  startCalibration(camera ?? undefined);
+});
 void api.getSettings().then(applySettings);
 void backdrop; // styled by CSS only

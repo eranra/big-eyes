@@ -8,6 +8,7 @@ import type { CameraChoice } from '../core/settings';
 interface CameraStream {
   index: number;
   label: string;
+  deviceId: string;
   stream: MediaStream;
   video: HTMLVideoElement;
   landmarker: FaceLandmarker;
@@ -37,7 +38,8 @@ export class FaceTracker {
   /** About 20 detections per second in total is enough for smooth eyes. */
   private readonly minInterval = 1000 / 20;
 
-  onFaces: (faces: FaceObservation[], time: number) => void = () => {};
+  /** Faces of all cameras (latest per camera) and the indexes of the cameras whose frames are included. */
+  onFaces: (faces: FaceObservation[], time: number, cameras: number[]) => void = () => {};
   onError: (message: string) => void = () => {};
 
   constructor(private readonly baseUrl: string) {}
@@ -51,9 +53,14 @@ export class FaceTracker {
       .map((d, i) => ({ deviceId: d.deviceId, label: d.label || `Camera ${i + 1}` }));
   }
 
-  /** Labels of the cameras that are open now, main camera first. */
+  /** Labels of the cameras that are open now. */
   get activeCameraLabels(): string[] {
     return this.streams.map((s) => s.label);
+  }
+
+  /** The cameras that are open now: index, name and device id. */
+  get openCameras(): Array<{ index: number; label: string; id: string }> {
+    return this.streams.map((s) => ({ index: s.index, label: s.label, id: s.deviceId }));
   }
 
   private async createLandmarker(): Promise<FaceLandmarker> {
@@ -98,8 +105,10 @@ export class FaceTracker {
           video.srcObject = stream;
           await video.play();
           const landmarker = await this.createLandmarker();
-          const label = stream.getVideoTracks()[0]?.label ?? 'Camera';
-          opened.push({ index: opened.length, label, stream, video, landmarker, lastVideoTime: -1, lastTimestamp: 0 });
+          const track = stream.getVideoTracks()[0];
+          const label = track?.label ?? 'Camera';
+          const deviceId = track?.getSettings().deviceId ?? id ?? '';
+          opened.push({ index: opened.length, label, deviceId, stream, video, landmarker, lastVideoTime: -1, lastTimestamp: 0 });
         } catch (error) {
           // One camera failing (busy, unplugged) must not stop the others.
           if (ids.length <= 1) throw error;
@@ -174,8 +183,13 @@ export class FaceTracker {
       this.latest.set(cam.index, { faces, time });
       // Report all cameras' latest faces. Drop results older than half a second.
       const all: FaceObservation[] = [];
-      for (const entry of this.latest.values()) if (time - entry.time < 0.5) all.push(...entry.faces);
-      this.onFaces(all, time);
+      const fresh: number[] = [];
+      for (const [index, entry] of this.latest) {
+        if (time - entry.time >= 0.5) continue;
+        all.push(...entry.faces);
+        fresh.push(index);
+      }
+      this.onFaces(all, time, fresh);
     } catch (error) {
       this.onError(describeError(error));
     }

@@ -28,11 +28,9 @@ export class MoodMachine {
   mood: Mood;
   /** Time (s) the current mood started. */
   moodStart: number;
-  private contactSince: number | null = null;
   private noContactSince: number | null;
   private absentSince: number | null;
   private wasPresent = false;
-  private smileSince: number | null = null;
   private noSmileSince: number | null = null;
 
   constructor(settings: MoodSettings = defaultSettings().mood, initial: Mood = 'curious', now = 0) {
@@ -52,19 +50,15 @@ export class MoodMachine {
     if (person.isPresent) this.absentSince = null;
     else this.absentSince ??= now;
 
+    // Durations come from the cameras' own timers (one camera's run, never added across cameras).
     if (person.isPresent && person.isMakingEyeContact) {
-      this.contactSince ??= now;
       this.noContactSince = null;
     } else {
-      this.contactSince = null;
       this.noContactSince ??= now;
     }
-    // A smile counts while the person is there and smiling (from any camera).
-    if (person.isPresent && person.isSmiling) {
-      this.smileSince ??= now;
+    if (person.isPresent && person.smileContactSeconds > 0) {
       this.noSmileSince = null;
     } else {
-      this.smileSince = null;
       this.noSmileSince ??= now;
     }
     const justAppeared = person.isPresent && !this.wasPresent;
@@ -79,7 +73,7 @@ export class MoodMachine {
 
   private next(person: PersonState, now: number, justAppeared: boolean): Mood {
     const s = this.settings;
-    const contactTime = this.contactSince === null ? 0 : now - this.contactSince;
+    const contactTime = person.isPresent ? person.contactSeconds : 0;
     const noContactTime = this.noContactSince === null ? 0 : now - this.noContactSince;
     const absentTime = this.absentSince === null ? 0 : now - this.absentSince;
 
@@ -93,11 +87,10 @@ export class MoodMachine {
       return 'surprised';
     }
     if (this.mood === 'surprised' && this.timeInMood(now) < s.surpriseDuration) return 'surprised';
-    const smileTime = this.smileSince === null ? 0 : now - this.smileSince;
     const noSmileTime = this.noSmileSince === null ? 0 : now - this.noSmileSince;
     const friendly = this.mood === 'happy' || this.mood === 'delighted';
-    // Smiling back: the person smiles while making eye contact (or right after, while still happy).
-    if (s.smileBack && smileTime >= s.smileToDelighted && (contactTime > 0 || friendly)) return 'delighted';
+    // Smiling back: ONE camera sees the smile and the eye contact together, for `smileToDelighted` seconds.
+    if (s.smileBack && person.smileContactSeconds >= s.smileToDelighted) return 'delighted';
     if (this.mood === 'delighted' && noSmileTime < s.delightedHold && (contactTime > 0 || noContactTime < s.happyHold)) {
       return 'delighted';
     }

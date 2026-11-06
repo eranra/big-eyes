@@ -1,4 +1,5 @@
-import { AttentionEstimator, type PersonState } from './attention';
+import type { PersonState } from './attention';
+import { MultiCameraAttention, type OpenCamera } from './multicamera';
 import { BlinkScheduler } from './blink';
 import type { FaceObservation } from './face';
 import { add, clamp, clampLength, lerpVec, scale, SeededRandom, type Vec2 } from './math';
@@ -102,7 +103,8 @@ export const MOOD_SHAPES: Readonly<Record<Mood, MoodShape>> = {
  */
 export class EyeAnimator {
   settings: Settings;
-  readonly attention: AttentionEstimator;
+  /** All cameras, each with its own calibration and timers (see MultiCameraAttention). */
+  readonly attention: MultiCameraAttention;
   readonly moods: MoodMachine;
   pose: EyePose;
   /** When set, this text replaces the mood caption (used during calibration). */
@@ -133,8 +135,6 @@ export class EyeAnimator {
   private readonly mouthAlpha = new Spring(1, 0.4, 1);
   private readonly closeRing = new Spring(0, 0.25, 1);
   private readonly winkSpring = new Spring(0, 0.12, 0.8);
-  /** Time eye contact started, for look-to-close. */
-  private contactStart: number | null = null;
   /** Time the goodbye wink started. */
   private goodbyeAt: number | null = null;
 
@@ -147,7 +147,7 @@ export class EyeAnimator {
 
   constructor(settings: Settings = defaultSettings(), seed = 42, now = 0) {
     this.settings = settings;
-    this.attention = new AttentionEstimator(settings.attention, settings.mirrorCamera);
+    this.attention = new MultiCameraAttention(settings.attention, settings.mirrorCamera, settings.calibrations);
     this.moods = new MoodMachine(settings.mood, 'curious', now);
     this.blinks = new BlinkScheduler(seed + 1, now);
     this.rng = new SeededRandom(seed);
@@ -167,13 +167,18 @@ export class EyeAnimator {
   /** Applies new settings without resetting the animation. */
   apply(settings: Settings): void {
     this.settings = settings;
-    this.attention.settings = settings.attention;
-    this.attention.mirror = settings.mirrorCamera;
+    this.attention.apply(settings.attention, settings.mirrorCamera, settings.calibrations);
     this.moods.settings = settings.mood;
   }
 
-  ingest(faces: readonly FaceObservation[], time: number): void {
-    this.attention.ingest(faces, time);
+  /** Faces from the cameras. `cameras` = indexes of cameras that sent a frame now (also with no face). */
+  ingest(faces: readonly FaceObservation[], time: number, cameras?: readonly number[]): void {
+    this.attention.ingest(faces, time, cameras);
+  }
+
+  /** Tells the animator which cameras are open (names come from the tracker). */
+  setCameras(cameras: readonly OpenCamera[]): void {
+    this.attention.setCameras(cameras);
   }
 
   /** Called when the overlay appears: the eyes open from closed with a blink. */
@@ -310,9 +315,8 @@ export class EyeAnimator {
     const enabled = this.settings.lookToClose && !this.lookToCloseSuspended && this.messageOverride === null;
     const contact = enabled && person.isPresent && person.isMakingEyeContact;
     if (this.goodbyeAt === null) {
-      if (contact) this.contactStart ??= now;
-      else this.contactStart = null;
-      const held = this.contactStart === null ? 0 : now - this.contactStart;
+      // The longest current eye contact on ONE camera (cameras never add up their time).
+      const held = contact ? person.contactSeconds : 0;
       // Show the ring only after a short moment, so normal glances do not show it.
       const delay = 0.4;
       const span = Math.max(this.settings.lookToCloseSeconds - delay, 0.1);

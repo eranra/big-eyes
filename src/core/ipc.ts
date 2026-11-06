@@ -1,5 +1,5 @@
 import type { FaceObservation } from './face';
-import type { GazeReference, Settings } from './settings';
+import type { CameraCalibration, Settings } from './settings';
 
 /** IPC channel names shared by main, preload and renderer. */
 export const IPC = {
@@ -99,6 +99,10 @@ export interface FacesMessage {
   faces: FaceObservation[];
   /** Time in seconds (performance.now based, on the tracker side). */
   time: number;
+  /** Indexes of the cameras whose latest frame is included (a camera that saw nobody is listed too). */
+  cameras?: number[];
+  /** The open cameras: index, name and id (so other windows can find each camera's calibration). */
+  openCameras?: Array<{ index: number; label: string; id: string }>;
 }
 
 /** The API exposed to renderer code by the preload script, as `window.bigEyes`. */
@@ -110,17 +114,23 @@ export interface BigEyesApi {
   getDisplays(): Promise<DisplaySummary[]>;
   onSettings(listener: (settings: Settings) => void): void;
   onVisibility(listener: (visible: boolean) => void): void;
-  onCalibrate(listener: () => void): void;
+  /** Calibrate: all open cameras one by one, or only the camera with this name. */
+  onCalibrate(listener: (camera: string | null) => void): void;
   onBlur(listener: (on: boolean) => void): void;
   getSaverTime(): Promise<{ seconds: number; source: string } | null>;
   onSaverTime(listener: (time: { seconds: number; source: string } | null) => void): void;
   onFaces(listener: (message: FacesMessage) => void): void;
   onPresenceCheck(listener: (active: boolean) => void): void;
-  sendPresenceFaces(message: { faces: FacesMessage['faces']; error?: string }): void;
+  sendPresenceFaces(message: {
+    faces: FacesMessage['faces'];
+    cameras?: FacesMessage['cameras'];
+    openCameras?: FacesMessage['openCameras'];
+    error?: string;
+  }): void;
   onStatus(listener: (message: string) => void): void;
   sendFaces(message: FacesMessage): void;
   sendCameras(cameras: CameraInfo[]): void;
-  sendCalibrated(reference: GazeReference): void;
+  sendCalibrated(calibration: CameraCalibration): void;
   sendStatus(message: string): void;
   sendLog(message: string): void;
   sendEyeArea(rect: { x: number; y: number; width: number; height: number }): void;
@@ -130,5 +140,6 @@ export interface BigEyesApi {
   onAboutUpdate(listener: (info: AboutInfo) => void): void;
   checkUpdates(): void;
   openLink(url: string): void;
-  calibrate(): void;
+  /** Settings window: calibrate all open cameras one by one, or only one camera. */
+  calibrate(camera?: string): void;
 }

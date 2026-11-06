@@ -129,11 +129,11 @@ Click the 👀 icon for quick choices, or open **Settings…** for everything, w
 | **Screen saver starts after** | Same as the system, or 5 min … 1 hour. "Same as the system" reads the screen saver time once at start and again when it changes: macOS IT policy or System Settings (else display sleep), Windows group policy or screen saver (else monitor off), Linux GNOME or KDE | Same as the system |
 | **Updates** | Check for new versions automatically | On |
 | **Screens** | Built-in screen, main screen, all screens, or the ones you pick | Built-in screen |
-| **Cameras** | Built-in camera, system default, all cameras, or the ones you pick. With several cameras, the first is the main one: the eyes follow what it sees, and the others notice you when it can't | Built-in camera |
+| **Cameras** | Built-in camera, system default, all cameras, or the ones you pick. With several cameras, **each camera watches on its own**, with its own calibration; the first one that sees you look (or smile) counts | Built-in camera |
 | **Smiles** | Smile back when you smile at them; show or hide the mouth; lip color | On |
 | **Text** | Show a word under the eyes when you look at them ("Welcome") and when you look away ("Bored") — and write your own words | Off |
 | **Background** | See-through … dark | Light |
-| **Calibrate** | Teach the eyes how *you* look at them, for your camera position | Built-in values |
+| **Calibrate** | Teach each camera how *you* look at the eyes from where it sits — camera by camera, saved per camera | Built-in values |
 | **Other** | Mirror camera, open at login, pause | |
 
 Settings are saved automatically and survive restarts and updates. They live in a small JSON file you can also edit:
