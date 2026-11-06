@@ -1,7 +1,7 @@
 {
   "name": "big-eyes",
   "productName": "Big Eyes",
-  "version": "0.3.4",
+  "version": "0.4.0",
   "description": "Big, friendly eyes that appear over your screen when you leave your computer idle, follow your head, smile when you look at them, and get bored when you look away.",
   "license": "Apache-2.0",
   "author": "Eran Raichstein",

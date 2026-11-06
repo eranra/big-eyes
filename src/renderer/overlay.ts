@@ -62,7 +62,13 @@ if (tracker) {
       const f = faces[0];
       const step = guidedStep(performance.now() / 1000);
       const perCamera = [0, 1, 2].map((c) => faces.filter((x) => (x.camera ?? 0) === c).length).join('/');
-      console.log((step ? `[${step.phase}] ` : '') + `faces=${perCamera} smile=${animator.person.smile.toFixed(2)}${animator.person.isSmiling ? '!' : ''} mood=${animator.mood}` + (f ? ` yaw=${f.yaw.toFixed(1)} pitch=${f.pitch.toFixed(1)} gaze=${f.gaze ? f.gaze.x.toFixed(2) + ',' + f.gaze.y.toFixed(2) : '-'} pos=${animator.person.position.x.toFixed(2)},${animator.person.position.y.toFixed(2)} contact=${animator.person.contactScore.toFixed(2)}` : ''));
+      const cams = tracker
+        .openCameras.map((c) => {
+          const st = animator.attention.camera(c.index).state;
+          return `${c.label.split(' ')[0]}:${st.isPresent ? '' : 'noface '}${st.isMakingEyeContact ? 'YES' : 'no'} ${st.contactSeconds.toFixed(1)}s smile=${st.smile.toFixed(2)}`;
+        })
+        .join(' | ');
+      console.log((step ? `[${step.phase}] ` : '') + `[${cams}] contact=${animator.person.contactSeconds.toFixed(1)}s ` + `faces=${perCamera} smile=${animator.person.smile.toFixed(2)}${animator.person.isSmiling ? '!' : ''} mood=${animator.mood}` + (f ? ` yaw=${f.yaw.toFixed(1)} pitch=${f.pitch.toFixed(1)} gaze=${f.gaze ? f.gaze.x.toFixed(2) + ',' + f.gaze.y.toFixed(2) : '-'} pos=${animator.person.position.x.toFixed(2)},${animator.person.position.y.toFixed(2)} contact=${animator.person.contactScore.toFixed(2)}` : ''));
     }
     animator.ingest(faces, time, cameras);
     api.sendFaces({ faces, time, cameras, openCameras });
@@ -140,7 +146,7 @@ function setVisible(next: boolean): void {
     animator = new EyeAnimator(settings, (Math.random() * 2 ** 31) | 0, now);
     animator.wakeUp(now);
     closeRequested = false;
-    if (api.role?.guidedTest) guidedStart = now;
+    if (api.role?.guidedTest && !calibrationPending) guidedStart = now;
     if (tracker) void startTracker();
     cancelAnimationFrame(frameHandle);
     frameHandle = requestAnimationFrame(frame);
@@ -182,6 +188,8 @@ function startCalibration(only?: string): void {
   nextCalibrationStep(calibrationQueue.length);
 }
 let calibrationRequestedAt = 0;
+/** Testing aid: a guided test waits until a requested calibration is finished. */
+let calibrationPending = false;
 
 function shortName(label: string): string {
   return label.replace(/\s*\([0-9a-f:]+\)\s*$/i, '');
@@ -194,6 +202,8 @@ function nextCalibrationStep(total: number): void {
     const done = calibrationFailed.length === 0;
     showMessage(done ? (total > 1 ? 'All cameras calibrated' : 'Got it') : `${calibrationFailed.join(', ')}: I couldn't see you`, 2500);
     calibrating = null;
+    calibrationPending = false;
+    if (api.role?.guidedTest) window.setTimeout(() => (guidedStart = performance.now() / 1000), 2500);
     return;
   }
   calibrationSamples = [];
@@ -295,6 +305,7 @@ api.onSettings(applySettings);
 api.onVisibility(setVisible);
 api.onCalibrate((camera) => {
   calibrationRequestedAt = performance.now();
+  calibrationPending = true;
   startCalibration(camera ?? undefined);
 });
 void api.getSettings().then(applySettings);

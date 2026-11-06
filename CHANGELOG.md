@@ -5,6 +5,8 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-06
+
 ### Changed
 
 - **Several cameras now work as equals.** Each camera has its own calibration, eye contact, smile and timers. The
