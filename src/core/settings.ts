@@ -33,6 +33,22 @@ export interface GazeReference {
   gaze: Vec2;
 }
 
+/**
+ * Calibration of one camera: what "looking at the eyes" looks like from where this camera sits.
+ * Saved by camera name and id, so it is found again after the camera is unplugged and plugged back in.
+ */
+export interface CameraCalibration {
+  /** Camera name, for example "MacBook Pro Camera (0000:0001)". */
+  label: string;
+  /** Camera device id when calibrated. Ids can change; the name is used when the id is not found. */
+  id: string;
+  reference: GazeReference;
+  /** Where the face was in this camera's picture when calibrated (0..1, origin top-left). */
+  faceCenter: Vec2;
+  /** ISO date of the calibration. */
+  date: string;
+}
+
 export interface AttentionSettings {
   reference: GazeReference;
   /** Allowed head yaw difference from the reference, degrees. */
@@ -137,6 +153,8 @@ export interface Settings {
   screens: ScreenChoice;
   /** Which cameras watch for people. */
   cameras: CameraChoice;
+  /** One calibration per camera. */
+  calibrations: CameraCalibration[];
   /** How dark the screen behind the eyes gets, 0 (fully transparent over your apps) .. 0.95. */
   backgroundDim: number;
   /** Iris color as a CSS hex color, for example "#3d85dc". */
@@ -477,6 +495,7 @@ export function defaultSettings(): Settings {
     eyeSize: 1,
     screens: { mode: 'builtin' },
     cameras: { mode: 'builtin' },
+    calibrations: [],
     backgroundDim: 0.35,
     irisColor: THEMES[0]!.irisColor,
     look: { ...THEMES[0]!.look },
@@ -543,6 +562,41 @@ function color(v: unknown, fallback: string): string {
 function vec2(v: unknown, fallback: Vec2, limit: number): Vec2 {
   if (!isObj(v)) return fallback;
   return { x: num(v.x, fallback.x, -limit, limit), y: num(v.y, fallback.y, -limit, limit) };
+}
+
+function calibrations(s: Obj): CameraCalibration[] {
+  const list = Array.isArray(s.calibrations) ? s.calibrations : [];
+  const out: CameraCalibration[] = [];
+  for (const c of list) {
+    if (!isObj(c) || typeof c.label !== 'string' || !c.label) continue;
+    const ref = isObj(c.reference) ? c.reference : {};
+    const d = defaultSettings().attention.reference;
+    out.push({
+      label: c.label.slice(0, 256),
+      id: typeof c.id === 'string' ? c.id.slice(0, 256) : '',
+      reference: {
+        yaw: num(ref.yaw, d.yaw, -90, 90),
+        pitch: num(ref.pitch, d.pitch, -90, 90),
+        gaze: vec2(ref.gaze, d.gaze, 1),
+      },
+      faceCenter: vec2(c.faceCenter, { x: 0.5, y: 0.5 }, 1),
+      date: typeof c.date === 'string' ? c.date.slice(0, 40) : '',
+    });
+  }
+  // One calibration per camera name (the newest wins), at most 16.
+  const byLabel = new Map<string, CameraCalibration>();
+  for (const c of out) byLabel.set(c.label, c);
+  return [...byLabel.values()].slice(-16);
+}
+
+/** The saved calibration for a camera, by id first, then by name. Null if this camera was never calibrated. */
+export function findCalibration(list: readonly CameraCalibration[], camera: { id?: string; label: string }): CameraCalibration | null {
+  return (camera.id ? list.find((c) => c.id === camera.id) : undefined) ?? list.find((c) => c.label === camera.label) ?? null;
+}
+
+/** Adds or replaces the calibration of one camera. */
+export function withCalibration(list: readonly CameraCalibration[], c: CameraCalibration): CameraCalibration[] {
+  return [...list.filter((x) => x.label !== c.label && (!c.id || x.id !== c.id)), c];
 }
 
 function savedCamera(v: unknown): SavedCamera | null {
@@ -642,6 +696,7 @@ export function normalizeSettings(input: unknown): Settings {
     eyeSize: num(s.eyeSize, d.eyeSize, 0.2, 2.5),
     screens: screens(s.screens, d.screens),
     cameras: cameraChoice(s, d.cameras),
+    calibrations: calibrations(s),
     backgroundDim: num(s.backgroundDim, d.backgroundDim, 0, 0.95),
     irisColor: color(s.irisColor, d.irisColor),
     look: look(s.look, d.look),

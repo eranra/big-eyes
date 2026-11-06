@@ -1,5 +1,5 @@
 import type { CameraInfo, DisplaySummary } from '../core/ipc';
-import { isBuiltInCamera } from '../core/camera';
+import { chooseCameras, isBuiltInCamera } from '../core/camera';
 import {
   BLINK_RATE_PRESETS,
   BLINK_SPEED_PRESETS,
@@ -9,6 +9,7 @@ import {
   LOOK_TO_CLOSE_PRESETS,
   matchingTheme,
   MOUSE_RULES,
+  findCalibration,
   POSITIONS,
   BLUR_MODES,
   SCREEN_SAVER_MODES,
@@ -23,6 +24,7 @@ import {
  */
 export type MenuAction =
   | { kind: 'patch'; patch: Record<string, unknown> }
+  | { kind: 'calibrateCamera'; camera: string }
   | {
       kind: 'command';
       command: 'show' | 'calibrate' | 'settings' | 'quit' | 'refreshCameras' | 'about' | 'checkUpdates' | 'update';
@@ -156,6 +158,25 @@ export function showAfterMenu(settings: Settings): MenuNode {
  * "Screen Saver": pause or replace, and, for replace, whether the screen behind the eyes is blurred
  * (on by default, so a replaced screen saver still hides what is on the screen).
  */
+/**
+ * "Calibrate Eye Contact": each camera is calibrated on its own. With one camera: a single item.
+ * With several: "All Cameras, One by One" plus one item per camera, with its status.
+ */
+export function calibrateMenu(settings: Settings, cameras: readonly CameraInfo[]): MenuNode {
+  const ids = chooseCameras(cameras, settings.cameras);
+  const used = ids.length ? cameras.filter((c) => ids.includes(c.deviceId)) : [];
+  if (used.length <= 1) return { label: 'Calibrate Eye Contact…', action: command('calibrate') };
+  const items: MenuNode[] = [{ label: 'All Cameras, One by One…', action: command('calibrate') }, separator];
+  for (const c of used) {
+    const done = findCalibration(settings.calibrations, { id: c.deviceId, label: c.label });
+    items.push({
+      label: `${c.label.replace(/\s*\([0-9a-f:]+\)\s*$/i, '')}${done ? ' ✓' : ' — not calibrated'}…`,
+      action: { kind: 'calibrateCamera', camera: c.label },
+    });
+  }
+  return { label: 'Calibrate Eye Contact', type: 'submenu', submenu: items };
+}
+
 export function screenSaverMenu(settings: Settings): MenuNode {
   const modes = presetMenu('Screen Saver', SCREEN_SAVER_MODES, settings.screenSaver, (a, b) => a === b, (v) => ({ screenSaver: v }));
   const blurred = settings.blur !== 'off';
@@ -251,7 +272,7 @@ export function buildMenuModel(
   const items: MenuNode[] = [
     ...top,
     { label: 'Show Eyes Now', accelerator: 'CommandOrControl+E', action: command('show') },
-    { label: 'Calibrate Eye Contact…', action: command('calibrate') },
+    calibrateMenu(settings, cameras),
     separator,
     presetMenu('Eye Size', EYE_SIZE_PRESETS, settings.eyeSize, near, (v) => ({ eyeSize: v })),
     showAfterMenu(settings),

@@ -25,7 +25,15 @@ import { ActivityClock } from '../core/activity';
 import { InputKinds$ } from './input-kinds';
 import type { FaceObservation } from '../core/face';
 import { IPC, type CameraInfo, type DisplaySummary, type FacesMessage, type OverlayRole } from '../core/ipc';
-import { blurActive, blurOnlyDisplays, screenSaverSeconds, selectDisplays, type GazeReference, type Settings } from '../core/settings';
+import {
+  blurActive,
+  blurOnlyDisplays,
+  normalizeSettings,
+  screenSaverSeconds,
+  selectDisplays,
+  withCalibration,
+  type Settings,
+} from '../core/settings';
 import { buildMenuModel, type MenuAction, type MenuNode } from './menu-model';
 import { SettingsStore } from './store';
 import { displaySleepPrevented, macSaverFiles, screenSaverRunning, setLinuxAutostart, systemScreenSaverTime } from './system';
@@ -124,6 +132,8 @@ let blurOn = false;
 /** The system's screen saver (or display sleep) time in seconds, read at start and every 10 minutes. */
 let systemSaverSeconds: number | null = null;
 let presenceStartedAt = 0;
+/** The cameras the tracker has open (names and ids), for each camera's own calibration in the presence check. */
+let presenceCameras: Array<{ index: number; label: string; id: string }> = [];
 let presenceFrames = 0;
 let lastCursor = { x: 0, y: 0 };
 
@@ -570,7 +580,7 @@ async function checkIdle(): Promise<void> {
         eventLog(`presence: nobody looking, showing the eyes (${presenceFrames} frames, ${(now - presenceStartedAt).toFixed(1)}s${presenceFrames === 0 ? ', the camera sent no frames' : ''})`);
       } else if (presence.due(now)) {
         eventLog('presence: checking with the camera');
-        presence.start(now, s.attention, s.mirrorCamera);
+        presence.start(now, s.attention, s.mirrorCamera, s.calibrations, presenceCameras);
         presenceStartedAt = now;
         presenceFrames = 0;
         setPresenceCamera(true);
@@ -626,6 +636,10 @@ function toElectronMenu(nodes: MenuNode[]): MenuItemConstructorOptions[] {
 }
 
 function runAction(action: MenuAction): void {
+  if (action.kind === 'calibrateCamera') {
+    setTimeout(() => calibrate(action.camera), 400);
+    return;
+  }
   if (action.kind === 'patch') {
     store.update(action.patch);
     return;
@@ -636,7 +650,7 @@ function runAction(action: MenuAction): void {
       setTimeout(show, 400);
       break;
     case 'calibrate':
-      setTimeout(calibrate, 400);
+      setTimeout(() => calibrate(null), 400);
       break;
     case 'settings':
       openSettingsWindow();
@@ -670,9 +684,10 @@ function updateTray(): void {
   tray.setToolTip(s.paused ? 'Big Eyes (paused)' : 'Big Eyes');
 }
 
-function calibrate(): void {
+/** Calibrate all open cameras one by one, or only the camera with this name. */
+function calibrate(camera: string | null = null): void {
   show();
-  for (const { window } of overlays) window.webContents.send(IPC.calibrate);
+  for (const { window } of overlays) window.webContents.send(IPC.calibrate, camera);
 }
 
 // ---- About window ---------------------------------------------------------------------------------
@@ -848,7 +863,7 @@ function registerIpc(): void {
   );
   ipcMain.on(IPC.checkUpdates, () => void updater?.check(true));
   ipcMain.on(IPC.openLink, (_e, url: unknown) => openLink(url));
-  ipcMain.on(IPC.presenceFaces, (event, message: { faces?: unknown; error?: unknown }) => {
+  ipcMain.on(IPC.presenceFaces, (event, message: { faces?: unknown; error?: unknown; cameras?: unknown; openCameras?: unknown }) => {
     const sender = overlays.find((o) => o.window.webContents === event.sender);
     if (!sender?.role.isTracker || presence.phase !== 'checking') return;
     if (typeof message?.error === 'string') {
@@ -860,7 +875,15 @@ function registerIpc(): void {
     }
     if (Array.isArray(message?.faces)) {
       presenceFrames++;
-      presence.report(message.faces as FaceObservation[], nowSeconds());
+      const m = message as { openCameras?: unknown; cameras?: unknown };
+      if (Array.isArray(m.openCameras)) {
+        presenceCameras = (m.openCameras as Array<{ index: number; label: string; id: string }>)
+          .filter((c) => Number.isInteger(c?.index) && typeof c?.label === 'string')
+          .map((c) => ({ index: c.index, label: c.label, id: typeof c.id === 'string' ? c.id : '' }));
+        presence.setCameras(presenceCameras);
+      }
+      const cams = Array.isArray(m.cameras) ? (m.cameras as unknown[]).filter((x): x is number => Number.isInteger(x)) : undefined;
+      presence.report(message.faces as FaceObservation[], nowSeconds(), cams);
     }
   });
   ipcMain.on(IPC.requestClose, (event) => {
@@ -875,10 +898,14 @@ function registerIpc(): void {
       .slice(0, 32);
     updateTray();
   });
-  ipcMain.on(IPC.calibrated, (event, reference: GazeReference) => {
+  ipcMain.on(IPC.calibrated, (event, calibration: unknown) => {
     const sender = overlays.find((o) => o.window.webContents === event.sender);
     if (!sender?.role.isTracker) return;
-    store.update({ attention: { reference } });
+    // Validate through the settings normalizer, then save as this camera's own calibration.
+    const one = normalizeSettings({ calibrations: [calibration] }).calibrations[0];
+    if (!one) return;
+    store.update({ calibrations: withCalibration(store.get().calibrations, one) });
+    eventLog(`calibrated ${one.label}: yaw ${one.reference.yaw.toFixed(1)} pitch ${one.reference.pitch.toFixed(1)}`);
   });
   ipcMain.on(IPC.log, (_e, message: unknown) => {
     if (typeof message === 'string') eventLog(message.slice(0, 300));
@@ -887,7 +914,7 @@ function registerIpc(): void {
     if (typeof message === 'string') setStatus(message.slice(0, 300));
   });
   ipcMain.on(IPC.preview, () => setTimeout(show, 300));
-  ipcMain.on(IPC.requestCalibrate, () => setTimeout(calibrate, 300));
+  ipcMain.on(IPC.requestCalibrate, (_e, camera: unknown) => setTimeout(() => calibrate(typeof camera === 'string' ? camera : null), 300));
 }
 
 // ---- Snapshot mode (for docs and visual checks) ---------------------------------------------------
@@ -1016,6 +1043,8 @@ void app.whenReady().then(async () => {
 
   setInterval(() => void checkIdle(), 100);
   if (SHOW_AT_START) setTimeout(show, 1200);
+  // Testing aid: start camera-by-camera calibration right away.
+  if (args.has('--calibrate-now')) setTimeout(() => calibrate(null), 3000);
 });
 
 app.on('before-quit', () => {

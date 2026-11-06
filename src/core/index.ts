@@ -11,3 +11,4 @@ export * from './camera';
 export * from './presence';
 export * from './update';
 export * from './activity';
+export * from './multicamera';

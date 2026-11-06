@@ -23,14 +23,14 @@ const api: BigEyesApi = {
   getSaverTime: () => ipcRenderer.invoke(IPC.getSaverTime),
   onSaverTime: (listener) => void ipcRenderer.on(IPC.saverTime, (_e, t) => listener(t)),
   onBlur: (listener) => void ipcRenderer.on(IPC.blur, (_e, on) => listener(Boolean(on))),
-  onCalibrate: (listener) => void ipcRenderer.on(IPC.calibrate, () => listener()),
+  onCalibrate: (listener) => void ipcRenderer.on(IPC.calibrate, (_e, camera) => listener(typeof camera === 'string' ? camera : null)),
   onFaces: (listener) => void ipcRenderer.on(IPC.facesBroadcast, (_e, m) => listener(m)),
   onPresenceCheck: (listener) => void ipcRenderer.on(IPC.presenceCheck, (_e, active) => listener(Boolean(active))),
   sendPresenceFaces: (message) => ipcRenderer.send(IPC.presenceFaces, message),
   onStatus: (listener) => void ipcRenderer.on(IPC.status, (_e, m) => listener(String(m))),
   sendFaces: (message) => ipcRenderer.send(IPC.faces, message),
   sendCameras: (cameras) => ipcRenderer.send(IPC.cameras, cameras),
-  sendCalibrated: (reference) => ipcRenderer.send(IPC.calibrated, reference),
+  sendCalibrated: (calibration) => ipcRenderer.send(IPC.calibrated, calibration),
   sendStatus: (message) => ipcRenderer.send(IPC.status, message),
   sendLog: (message) => ipcRenderer.send(IPC.log, message),
   sendEyeArea: (rect) => ipcRenderer.send(IPC.eyeArea, rect),
@@ -40,7 +40,7 @@ const api: BigEyesApi = {
   onAboutUpdate: (listener) => void ipcRenderer.on(IPC.aboutUpdate, (_e, info) => listener(info)),
   checkUpdates: () => ipcRenderer.send(IPC.checkUpdates),
   openLink: (url) => ipcRenderer.send(IPC.openLink, url),
-  calibrate: () => ipcRenderer.send(IPC.requestCalibrate),
+  calibrate: (camera) => ipcRenderer.send(IPC.requestCalibrate, camera ?? null),
 };
 
 contextBridge.exposeInMainWorld('bigEyes', api);

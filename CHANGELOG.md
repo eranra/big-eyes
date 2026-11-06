@@ -5,6 +5,14 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **Several cameras now work as equals.** Each camera has its own calibration, eye contact, smile and timers. The
+  first camera that sees you look at the eyes (or smile while looking) counts, for happy, smiling back,
+  look-to-close and "wait while I'm looking". Times on different cameras never add up.
+- **Calibration is camera by camera** ("camera 1 of 2: …"), saved per camera and kept when you change cameras.
+  Settings and the menu show each camera's calibration and can calibrate or forget one camera.
+
 ## [0.3.4] - 2026-11-05
 
 ### Fixed

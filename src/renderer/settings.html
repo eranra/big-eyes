@@ -208,13 +208,19 @@
           <button id="refreshCameras" class="small" title="Refresh the camera list">↻ Refresh list</button>
         </div>
         <div id="cameraTests" class="camera-tests" hidden></div>
+        <p class="hint">
+          Each camera is calibrated on its own: look into the eyes while it records. With several cameras, each one
+          watches on its own, and the first one that sees you look (or smile) counts. A camera that is not calibrated
+          only notices that you are there.
+        </p>
+        <div id="calibrations"></div>
         <label class="row check">
           <input id="mirrorCamera" type="checkbox" />
           <span>Mirror camera (use if the eyes look the wrong way)</span>
         </label>
         <div class="row buttons">
           <button id="testCamera">Test cameras</button>
-          <button id="calibrate">Calibrate eye contact…</button>
+          <button id="calibrate">Calibrate all cameras, one by one…</button>
         </div>
       </section>
 

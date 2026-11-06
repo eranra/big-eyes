@@ -116,12 +116,31 @@ Automatic checks run 10 seconds after start and every 6 hours, and announce each
 
 ## Several cameras
 
-The tracker opens every chosen camera, each with its own MediaPipe landmarker, and processes them in turn
-(about 20 detections per second in total). Every face carries the index of its camera; 0 is the main camera.
+Each open camera works on its own (`src/core/multicamera.ts`). The tracker opens every chosen camera, each with its
+own MediaPipe landmarker, and processes them in turn (about 20 detections per second in total). Every face carries
+the index of its camera, and every camera has its own `AttentionEstimator`:
 
-`AttentionEstimator.ingest()` uses the main camera for position and eye contact, because only the camera next to
-the eyes can tell whether you look *at the eyes*. When the main camera sees nobody, a face on another camera keeps
-the person present, the eyes keep their last position, and eye contact fades. Smiles count from any camera.
+- its own **calibration** (`settings.calibrations`, one entry per camera, found by id or name);
+- its own eye contact and smile decisions, with the same thresholds;
+- its own **timers**: how long its eye contact, and its smile together with eye contact, have lasted.
+
+The cameras are combined as "the first camera to see it wins":
+
+| Combined value | Rule |
+|---|---|
+| present | any camera sees a face |
+| eye contact | any camera has eye contact |
+| `contactSeconds` | the longest current run on ONE camera (never added across cameras) |
+| `smileContactSeconds` | the longest run where the SAME camera sees smile and eye contact |
+| where the eyes look | the camera with eye contact; else the one followed before; else the biggest face |
+
+Happy, smiling back, look-to-close and "wait while I'm looking" all use these values, so one camera reaching the time
+on its own is enough, and short looks on different cameras never add up.
+
+**Calibration** is camera by camera: "Calibrate" walks through the open cameras one at a time ("camera 1 of 2:
+<name>"), and each step records only that camera. Calibrations stay when the camera choice changes. A camera without
+a calibration uses the default values when it is the only camera; with several cameras it counts for presence only.
+Settings from before per-camera calibration keep their single calibration for the built-in camera.
 
 ## Smiles
 
