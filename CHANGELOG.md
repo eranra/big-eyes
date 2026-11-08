@@ -5,6 +5,12 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-11-08
+
+### Changed
+
+- Project history and metadata clean-up. No change to how the app works.
+
 ## [0.4.0] - 2026-11-06
 
 ### Changed
