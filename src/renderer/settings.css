@@ -233,6 +233,18 @@ body:not(.mac) .mac-only {
   align-items: center;
   gap: 8px;
 }
+.row input[type='number'] {
+  width: 64px;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 8px;
+  font: inherit;
+}
+.row [hidden] {
+  display: none;
+}
 .row.colors {
   align-items: flex-start;
   padding: 6px 0;

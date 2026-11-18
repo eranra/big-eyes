@@ -112,6 +112,14 @@ export type ScreenSaverMode = 'pause' | 'replace';
  */
 export type BlurMode = 'off' | 'screensaver' | 'always';
 
+/**
+ * What happens when the eyes have replaced the screen saver for `afterEyesMinutes` ("replace" mode only).
+ * - 'none': the eyes stay until someone comes back.
+ * - 'screensaver': start the real system screen saver (it locks if the system asks for a password after it).
+ * - 'lock': lock the screen.
+ */
+export type AfterEyesAction = 'none' | 'screensaver' | 'lock';
+
 export interface BlinkSettings {
   /** How often the eyes blink: 0 = never, 1 = normal (every 2-5 s), 3 = very often. */
   rate: number;
@@ -138,6 +146,10 @@ export interface Settings {
    * 0 = use the system: the macOS screen saver time if set, else the display sleep time.
    */
   screenSaverMinutes: number;
+  /** "Replace" mode: what happens after the eyes have replaced the screen saver for `afterEyesMinutes`. */
+  afterEyes: AfterEyesAction;
+  /** Minutes after the screen saver time before `afterEyes` happens (0 = right at the screen saver time). */
+  afterEyesMinutes: number;
   /** Blur strength, 0.3 (light) .. 1 (strong: nothing readable behind). */
   blurStrength: number;
   /** What mouse movement does while the eyes are shown. */
@@ -161,12 +173,6 @@ export interface Settings {
   irisColor: string;
   /** How the eyes look, apart from the iris color. */
   look: LookSettings;
-  /** Text shown when you make eye contact. */
-  welcomeText: string;
-  /** Text shown when you look away for a while. */
-  boredText: string;
-  /** Show the texts at all. */
-  showCaptions: boolean;
   /** Flip left/right if the camera delivers mirrored images. */
   mirrorCamera: boolean;
   /** macOS: do not appear while an app keeps the display awake (videos, presentations). */
@@ -181,6 +187,12 @@ export interface Settings {
   lastAnnouncedVersion: string | null;
   /** Stop showing the eyes until resumed. */
   paused: boolean;
+  /** Happy messages shown while the eyes are sleeping or bored (nobody nearby). */
+  showInspirations: boolean;
+  /** Seconds between happy messages while idle. */
+  inspirationsInterval: number;
+  /** How long each happy message stays visible, seconds. */
+  inspirationsDuration: number;
   attention: AttentionSettings;
   mood: MoodSettings;
 }
@@ -433,6 +445,35 @@ export function blurActive(
   return idleSeconds >= screenSaverSeconds(s, systemScreenSaverSeconds);
 }
 
+export const AFTER_EYES_ACTIONS: ReadonlyArray<{ label: string; value: AfterEyesAction }> = [
+  { label: 'Keep the Eyes', value: 'none' },
+  { label: 'Start the Screen Saver', value: 'screensaver' },
+  { label: 'Lock the Screen', value: 'lock' },
+];
+
+/** Delays for `afterEyesMinutes`. Settings also accepts any other number of minutes. */
+export const AFTER_EYES_DELAY_PRESETS: ReadonlyArray<{ label: string; value: number }> = [
+  { label: 'Right Away', value: 0 },
+  { label: '1 minute', value: 1 },
+  { label: '5 minutes', value: 5 },
+  { label: '10 minutes', value: 10 },
+  { label: '15 minutes', value: 15 },
+  { label: '30 minutes', value: 30 },
+  { label: '1 hour', value: 60 },
+];
+
+/**
+ * Seconds of no input after which `afterEyes` happens, or null when it never does
+ * (not in "replace" mode, the action is 'none', or Big Eyes is paused).
+ */
+export function afterEyesSeconds(
+  s: Pick<Settings, 'screenSaver' | 'screenSaverMinutes' | 'afterEyes' | 'afterEyesMinutes' | 'paused'>,
+  systemScreenSaverSeconds: number | null,
+): number | null {
+  if (s.screenSaver !== 'replace' || s.afterEyes === 'none' || s.paused) return null;
+  return screenSaverSeconds(s, systemScreenSaverSeconds) + s.afterEyesMinutes * 60;
+}
+
 export const BLINK_RATE_PRESETS: ReadonlyArray<{ label: string; value: number }> = [
   { label: 'Never', value: 0 },
   { label: 'Rarely', value: 0.4 },
@@ -487,6 +528,8 @@ export function defaultSettings(): Settings {
     screenSaver: 'pause',
     blur: 'screensaver',
     screenSaverMinutes: 0,
+    afterEyes: 'screensaver',
+    afterEyesMinutes: 5,
     blurStrength: 1,
     mouseRule: 'onto-eyes',
     lookToClose: false,
@@ -499,9 +542,9 @@ export function defaultSettings(): Settings {
     backgroundDim: 0.35,
     irisColor: THEMES[0]!.irisColor,
     look: { ...THEMES[0]!.look },
-    welcomeText: 'Welcome',
-    boredText: 'Bored',
-    showCaptions: false,
+    showInspirations: true,
+    inspirationsInterval: 10,
+    inspirationsDuration: 5,
     mirrorCamera: false,
     respectVideoPlayback: true,
     openAtLogin: false,
@@ -684,6 +727,8 @@ export function normalizeSettings(input: unknown): Settings {
     screenSaver: oneOf(s.screenSaver, ['pause', 'replace'] as const, d.screenSaver),
     blur: oneOf(s.blur, ['off', 'screensaver', 'always'] as const, d.blur),
     screenSaverMinutes: Math.round(num(s.screenSaverMinutes, d.screenSaverMinutes, 0, 600)),
+    afterEyes: oneOf(s.afterEyes, ['none', 'screensaver', 'lock'] as const, d.afterEyes),
+    afterEyesMinutes: Math.round(num(s.afterEyesMinutes, d.afterEyesMinutes, 0, 600)),
     blurStrength: num(s.blurStrength, d.blurStrength, 0.3, 1),
     position: oneOf(s.position, ['center', 'top-left', 'top-right', 'bottom-left', 'bottom-right'] as const, d.position),
     mouseRule: oneOf(s.mouseRule, ['onto-eyes', 'any', 'never'] as const, d.mouseRule),
@@ -700,9 +745,9 @@ export function normalizeSettings(input: unknown): Settings {
     backgroundDim: num(s.backgroundDim, d.backgroundDim, 0, 0.95),
     irisColor: color(s.irisColor, d.irisColor),
     look: look(s.look, d.look),
-    welcomeText: text(s.welcomeText, d.welcomeText),
-    boredText: text(s.boredText, d.boredText),
-    showCaptions: bool(s.showCaptions, d.showCaptions),
+    showInspirations: bool(s.showInspirations, d.showInspirations),
+    inspirationsInterval: num(s.inspirationsInterval, d.inspirationsInterval, 3, 120),
+    inspirationsDuration: num(s.inspirationsDuration, d.inspirationsDuration, 1, 30),
     mirrorCamera: bool(s.mirrorCamera, d.mirrorCamera),
     respectVideoPlayback: bool(s.respectVideoPlayback, d.respectVideoPlayback),
     openAtLogin: bool(s.openAtLogin, d.openAtLogin),

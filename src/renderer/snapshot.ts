@@ -28,7 +28,7 @@ window.renderMood = (name: Mood): void => {
   canvas.width = w * dpr;
   canvas.height = h * dpr;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  const settings = { ...defaultSettings(), showCaptions: true };
+  const settings = defaultSettings();
   const pose = staticPose(mood, settings);
   if (theme) pose.gaze = { x: -0.25, y: 0.1 };
   if ((name as string) === 'goodbye') {

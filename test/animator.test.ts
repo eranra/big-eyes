@@ -60,12 +60,10 @@ describe('EyeAnimator', () => {
     expect(a.pose.captionOpacity).toBeLessThan(0.05);
   });
 
-  it('eye contact shows Welcome and a smile when text is on', () => {
-    const a = new EyeAnimator({ ...defaultSettings(), showCaptions: true }, 2);
+  it('eye contact shows a smile', () => {
+    const a = new EyeAnimator(defaultSettings(), 2);
     simulate(a, [lookingFace()], 0, 3);
     expect(a.mood).toBe('happy');
-    expect(a.pose.caption).toBe('Welcome');
-    expect(a.pose.captionOpacity).toBeGreaterThan(0.8);
     expect(a.pose.smile).toBeGreaterThan(0.4);
   });
 
@@ -77,11 +75,10 @@ describe('EyeAnimator', () => {
     expect(smiling.pose.smile).toBeGreaterThan(plain.pose.smile + 0.1);
   });
 
-  it('looking away shows Bored and heavy lids', () => {
-    const a = new EyeAnimator({ ...defaultSettings(), showCaptions: true }, 3);
+  it('looking away shows heavy lids', () => {
+    const a = new EyeAnimator(defaultSettings(), 3);
     simulate(a, [awayFace(0.2)], 0, 6);
     expect(a.mood).toBe('bored');
-    expect(a.pose.caption).toBe('Bored');
     expect(a.pose.upperLid).toBeGreaterThan(0.35);
   });
 
@@ -103,18 +100,12 @@ describe('EyeAnimator', () => {
     expect(seen.size).toBeGreaterThan(5);
   });
 
-  it('shows a message override and custom texts', () => {
+  it('shows a message override', () => {
     const a = new EyeAnimator(defaultSettings(), 6);
     a.messageOverride = 'Look into my eyes';
     simulate(a, [], 0, 1.5);
     expect(a.pose.caption).toBe('Look into my eyes');
     expect(a.pose.captionOpacity).toBeGreaterThan(0.7);
-
-    const s = { ...defaultSettings(), showCaptions: true };
-    s.welcomeText = 'Hi there';
-    const b = new EyeAnimator(s, 7);
-    simulate(b, [lookingFace()], 0, 3);
-    expect(b.pose.caption).toBe('Hi there');
   });
 
   it('static poses exist for every mood', () => {

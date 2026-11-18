@@ -4,7 +4,7 @@ import { findCalibration } from '../core/settings';
 import type { CameraInfo } from '../core/ipc';
 import type { BigEyesApi, DisplaySummary } from '../core/ipc';
 import type { Mood } from '../core/mood';
-import { defaultSettings, EYE_SHAPES, IRIS_PRESETS, MOUSE_RULES, POSITIONS, PUPIL_SHAPES, SCREEN_SAVER_MODES, BLUR_MODES, SCREEN_SAVER_TIME_PRESETS, IRIS_STYLES, matchingTheme, THEMES, type LookSettings, type Settings } from '../core/settings';
+import { defaultSettings, EYE_SHAPES, IRIS_PRESETS, MOUSE_RULES, POSITIONS, PUPIL_SHAPES, SCREEN_SAVER_MODES, BLUR_MODES, SCREEN_SAVER_TIME_PRESETS, AFTER_EYES_ACTIONS, AFTER_EYES_DELAY_PRESETS, IRIS_STYLES, matchingTheme, THEMES, type LookSettings, type Settings } from '../core/settings';
 import { drawEyes } from './draw';
 import { FaceTracker } from './tracker';
 
@@ -114,8 +114,8 @@ const numberFields: Record<NumberField, (v: number) => string> = {
   backgroundDim: (v) => (v === 0 ? 'none' : `${Math.round(v * 100)}%`),
   idleTimeout: formatSeconds,
 };
-type BoolField = 'showCaptions' | 'respectVideoPlayback' | 'openAtLogin' | 'paused' | 'mirrorCamera' | 'showDebugInfo' | 'waitWhileWatched';
-const boolFields: BoolField[] = ['showCaptions', 'respectVideoPlayback', 'openAtLogin', 'paused', 'mirrorCamera', 'showDebugInfo', 'waitWhileWatched'];
+type BoolField = 'showInspirations' | 'respectVideoPlayback' | 'openAtLogin' | 'paused' | 'mirrorCamera' | 'showDebugInfo' | 'waitWhileWatched';
+const boolFields: BoolField[] = ['showInspirations', 'respectVideoPlayback', 'openAtLogin', 'paused', 'mirrorCamera', 'showDebugInfo', 'waitWhileWatched'];
 
 let saveTimer = 0;
 function save(patch: Record<string, unknown>, delay = 150): void {
@@ -138,14 +138,6 @@ for (const key of boolFields) {
   const input = $<HTMLInputElement>(key);
   input.addEventListener('change', () => save({ [key]: input.checked }, 0));
 }
-for (const key of ['welcomeText', 'boredText'] as const) {
-  const input = $<HTMLInputElement>(key);
-  input.addEventListener('input', () => {
-    settings = { ...settings, [key]: input.value };
-    save({ [key]: input.value }, 400);
-  });
-}
-
 const irisInput = $<HTMLInputElement>('irisColor');
 irisInput.addEventListener('input', () => {
   settings = { ...settings, irisColor: irisInput.value };
@@ -309,6 +301,31 @@ function showSaverTime(time: { seconds: number; source: string } | null): void {
 }
 api.onSaverTime(showSaverTime);
 void api.getSaverTime().then(showSaverTime);
+const afterEyesSelect = $<HTMLSelectElement>('afterEyes');
+for (const m of AFTER_EYES_ACTIONS) afterEyesSelect.append(new Option(m.label, m.value));
+afterEyesSelect.addEventListener('change', () => save({ afterEyes: afterEyesSelect.value }, 0));
+const afterMinutes = $<HTMLSelectElement>('afterEyesMinutes');
+for (const p of AFTER_EYES_DELAY_PRESETS) afterMinutes.append(new Option(p.label, String(p.value)));
+afterMinutes.append(new Option('Other…', 'other'));
+const afterCustom = $<HTMLInputElement>('afterEyesCustom');
+const afterCustomUnit = $('afterEyesCustomUnit');
+function showAfterCustom(visible: boolean): void {
+  afterCustom.hidden = !visible;
+  afterCustomUnit.hidden = !visible;
+}
+afterMinutes.addEventListener('change', () => {
+  if (afterMinutes.value === 'other') {
+    showAfterCustom(true);
+    afterCustom.focus();
+    return;
+  }
+  showAfterCustom(false);
+  save({ afterEyesMinutes: Number(afterMinutes.value) }, 0);
+});
+afterCustom.addEventListener('change', () => {
+  const minutes = Math.round(Number(afterCustom.value));
+  if (Number.isFinite(minutes) && minutes >= 0 && minutes <= 600) save({ afterEyesMinutes: minutes }, 0);
+});
 const blurSelect = $<HTMLSelectElement>('blur');
 for (const m of BLUR_MODES) blurSelect.append(new Option(m.label, m.value));
 blurSelect.addEventListener('change', () => save({ blur: blurSelect.value }, 0));
@@ -319,6 +336,21 @@ blurStrength.addEventListener('input', () => {
 });
 const smileBack = $<HTMLInputElement>('smileBack');
 smileBack.addEventListener('change', () => save({ mood: { smileBack: smileBack.checked } }, 0));
+const inspirationsInterval = $<HTMLInputElement>('inspirationsInterval');
+const inspirationsDuration = $<HTMLInputElement>('inspirationsDuration');
+inspirationsInterval.addEventListener('input', () => {
+  const v = Number(inspirationsInterval.value);
+  (inspirationsInterval.nextElementSibling as HTMLOutputElement).value = `${v}s`;
+  settings = { ...settings, inspirationsInterval: v };
+  save({ inspirationsInterval: v });
+});
+inspirationsDuration.addEventListener('input', () => {
+  const v = Number(inspirationsDuration.value);
+  (inspirationsDuration.nextElementSibling as HTMLOutputElement).value = `${v}s`;
+  settings = { ...settings, inspirationsDuration: v };
+  save({ inspirationsDuration: v });
+});
+
 const lookToClose = $<HTMLInputElement>('lookToClose');
 lookToClose.addEventListener('change', () => save({ lookToClose: lookToClose.checked }, 0));
 const lookSeconds = $<HTMLInputElement>('lookToCloseSeconds');
@@ -344,6 +376,15 @@ function renderBehavior(next: Settings): void {
   }
   saverMinutes.value = String(next.screenSaverMinutes);
   saverMinutes.disabled = next.screenSaver !== 'replace';
+  afterEyesSelect.value = next.afterEyes;
+  afterEyesSelect.disabled = next.screenSaver !== 'replace';
+  const preset = AFTER_EYES_DELAY_PRESETS.some((p) => p.value === next.afterEyesMinutes);
+  if (document.activeElement !== afterCustom) {
+    afterMinutes.value = preset ? String(next.afterEyesMinutes) : 'other';
+    afterCustom.value = String(next.afterEyesMinutes);
+    showAfterCustom(!preset);
+  }
+  afterMinutes.disabled = afterCustom.disabled = next.screenSaver !== 'replace' || next.afterEyes === 'none';
   if (document.activeElement !== blurStrength) blurStrength.value = String(next.blurStrength);
   (blurStrength.nextElementSibling as HTMLOutputElement).value = `${Math.round(next.blurStrength * 100)}%`;
   blurStrength.disabled = next.blur === 'off';
@@ -576,10 +617,6 @@ function render(next: Settings): void {
     (input.nextElementSibling as HTMLOutputElement).value = format(next[key]);
   }
   for (const key of boolFields) $<HTMLInputElement>(key).checked = next[key];
-  for (const key of ['welcomeText', 'boredText'] as const) {
-    const input = $<HTMLInputElement>(key);
-    if (document.activeElement !== input) input.value = next[key];
-  }
   irisInput.value = next.irisColor;
   renderLook(next.look);
   renderBehavior(next);

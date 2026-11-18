@@ -87,6 +87,17 @@ counts. So looking at a phone, a book or another screen does not hold the eyes b
   Big Eyes runs. The "don't show during video" check ignores this blocker, because it is our own.
 - Blur in `replace` mode starts when the idle time reaches the screen saver time (`screenSaverSeconds()`): the
   user's own time, else the system time from `systemScreenSaverTime()` (`src/main/system.ts`), else 10 minutes.
+- "After the eyes" (`replace` mode): at the screen saver time plus `afterEyesMinutes` (`afterEyesSeconds()`), Big Eyes
+  hands over to the system. `AfterEyesTimer` (`src/core/after-eyes.ts`) fires once per idle stretch. On hand-over the
+  eyes and blur hide, the display-sleep blocker is released (so the system's own display sleep applies again), and
+  then `startScreenSaver()` or `lockScreen()` runs. New input ends the hand-over and takes the blocker again. Like the
+  system screen saver, it waits while another app keeps the display awake (calls, video), if that option is on.
+
+  | System | Start the screen saver | Lock the screen |
+  |---|---|---|
+  | macOS | `open -a ScreenSaverEngine` | `idle-helper --lock` (`SACLockScreenImmediate` in login.framework, the Control-Command-Q lock; looked up at run time). Without the helper: the screen saver |
+  | Windows | `SCRNSAVE.EXE` from group policy or `HKCU\Control Panel\Desktop`, run with `/s`; none set: lock | `rundll32 user32.dll,LockWorkStation` |
+  | Linux | `xdg-screensaver activate`; failing that: lock | `loginctl lock-session`, else `xdg-screensaver lock` |
 
   | System | Sources, first found wins |
   |---|---|

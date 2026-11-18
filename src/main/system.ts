@@ -1,5 +1,5 @@
-import { execFile } from 'node:child_process';
-import { promises as fs } from 'node:fs';
+import { execFile, spawn } from 'node:child_process';
+import { existsSync, promises as fs } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
@@ -212,4 +212,83 @@ export async function systemScreenSaverTime(): Promise<SaverTime | null> {
 /** Seconds only, for callers that do not need the source. */
 export async function systemScreenSaverSeconds(): Promise<number | null> {
   return (await systemScreenSaverTime())?.seconds ?? null;
+}
+
+/** Parses one REG_SZ value that may contain spaces (a file path) from `reg query` output. Exported for tests. */
+export function parseRegString(output: string | null, name: string): string | null {
+  if (!output) return null;
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const m = new RegExp(`^\\s*${escaped}\\s+REG_(?:EXPAND_)?SZ\\s+(.+?)\\s*$`, 'im').exec(output);
+  return m ? m[1]! : null;
+}
+
+/** Expands %NAME% parts of a Windows path from the environment (unknown names stay as they are). Exported for tests. */
+export function expandWindowsVars(value: string, env: NodeJS.ProcessEnv = process.env): string {
+  return value.replace(/%([^%]+)%/g, (whole, name: string) => {
+    const key = Object.keys(env).find((k) => k.toLowerCase() === name.toLowerCase());
+    return key ? env[key]! : whole;
+  });
+}
+
+/** Starts a program that keeps running (a screen saver), without waiting for it. */
+function launch(cmd: string, args: string[]): Promise<boolean> {
+  return new Promise((resolve) => {
+    try {
+      const child = spawn(cmd, args, { detached: true, stdio: 'ignore', windowsHide: false });
+      child.once('error', () => resolve(false));
+      child.once('spawn', () => {
+        child.unref();
+        resolve(true);
+      });
+    } catch {
+      resolve(false);
+    }
+  });
+}
+
+/** How the system action was done (for the log), or null when it failed. */
+export type SystemActionResult = string | null;
+
+/**
+ * Locks the screen.
+ * - macOS: the idle helper's `--lock` command (the same lock as Control-Command-Q). Without the helper, it starts
+ *   the screen saver instead, which locks only if the system asks for a password after the screen saver.
+ * - Windows: LockWorkStation.
+ * - Linux: `loginctl lock-session`, else `xdg-screensaver lock`.
+ */
+export async function lockScreen(macHelper: string | null): Promise<SystemActionResult> {
+  if (process.platform === 'darwin') {
+    if (macHelper && existsSync(macHelper) && (await run(macHelper, ['--lock'])) !== null) return 'macOS lock';
+    return (await startScreenSaver()) ? 'screen saver (the lock function was not available)' : null;
+  }
+  if (process.platform === 'win32') {
+    return (await run('rundll32.exe', ['user32.dll,LockWorkStation'])) !== null ? 'LockWorkStation' : null;
+  }
+  if ((await run('loginctl', ['lock-session'])) !== null) return 'loginctl lock-session';
+  if ((await run('xdg-screensaver', ['lock'])) !== null) return 'xdg-screensaver lock';
+  return null;
+}
+
+/**
+ * Starts the real system screen saver.
+ * - macOS: ScreenSaverEngine.
+ * - Windows: the screen saver chosen in the settings (or by group policy); without one, it locks the screen.
+ * - Linux: `xdg-screensaver activate`; if that fails, it locks the screen.
+ */
+export async function startScreenSaver(): Promise<SystemActionResult> {
+  if (process.platform === 'darwin') {
+    return (await run('/usr/bin/open', ['-a', 'ScreenSaverEngine'])) !== null ? 'ScreenSaverEngine' : null;
+  }
+  if (process.platform === 'win32') {
+    const policy = await run('reg', ['query', 'HKCU\\Software\\Policies\\Microsoft\\Windows\\Control Panel\\Desktop']);
+    const desktop = await run('reg', ['query', 'HKCU\\Control Panel\\Desktop']);
+    const raw = parseRegString(policy, 'SCRNSAVE.EXE') ?? parseRegString(desktop, 'SCRNSAVE.EXE');
+    const file = raw ? expandWindowsVars(raw) : null;
+    if (file && (await launch(file, ['/s']))) return path.basename(file);
+    const locked = await lockScreen(null);
+    return locked ? `${locked} (no screen saver is set)` : null;
+  }
+  if ((await run('xdg-screensaver', ['activate'])) !== null) return 'xdg-screensaver activate';
+  const locked = await lockScreen(null);
+  return locked ? `${locked} (the screen saver could not start)` : null;
 }

@@ -22,10 +22,12 @@ import { pathToFileURL } from 'node:url';
 import { IdleMonitor, pointInRects } from '../core/idle';
 import { PresenceCheck } from '../core/presence';
 import { ActivityClock } from '../core/activity';
+import { AfterEyesTimer } from '../core/after-eyes';
 import { InputKinds$ } from './input-kinds';
 import type { FaceObservation } from '../core/face';
 import { IPC, type CameraInfo, type DisplaySummary, type FacesMessage, type OverlayRole } from '../core/ipc';
 import {
+  afterEyesSeconds,
   blurActive,
   blurOnlyDisplays,
   normalizeSettings,
@@ -36,7 +38,15 @@ import {
 } from '../core/settings';
 import { buildMenuModel, type MenuAction, type MenuNode } from './menu-model';
 import { SettingsStore } from './store';
-import { displaySleepPrevented, macSaverFiles, screenSaverRunning, setLinuxAutostart, systemScreenSaverTime } from './system';
+import {
+  displaySleepPrevented,
+  lockScreen,
+  macSaverFiles,
+  screenSaverRunning,
+  setLinuxAutostart,
+  startScreenSaver,
+  systemScreenSaverTime,
+} from './system';
 import * as fsWatch from 'node:fs';
 import { Updater, updateMenuLabel, type UpdateState } from './updater';
 import { log as writeLog, logFile } from './logger';
@@ -125,6 +135,11 @@ let inputKinds: InputKinds$ | null = null;
 let screenSaverBlocker: number | null = null;
 let screenSaverActive = false;
 let lastScreenSaverCheck = 0;
+/** "Replace" mode: hands over to the real screen saver, or locks, after the eyes were there for a while. */
+const afterEyes = new AfterEyesTimer();
+/** True while the screen saver / lock command runs, so it runs once. */
+let afterEyesRunning = false;
+let lastAfterEyesCheck = 0;
 let lastActivityLog = 0;
 let lastBlockLog = 0;
 /** Whether the overlays are blurred right now. */
@@ -410,7 +425,8 @@ function ownPids(): number[] {
 
 /** "Replace the screen saver" mode: hold a display-sleep blocker, which also keeps the screen saver away. */
 function applyScreenSaverMode(s: Settings): void {
-  const want = s.screenSaver === 'replace' && !s.paused;
+  // After the hand-over to the system (real screen saver or lock), the system's own timers apply again.
+  const want = s.screenSaver === 'replace' && !s.paused && !afterEyes.handedOff;
   if (want && screenSaverBlocker === null) {
     screenSaverBlocker = powerSaveBlocker.start('prevent-display-sleep');
     eventLog('screen saver: blocked (eyes replace it)');
@@ -459,6 +475,26 @@ function watchSaverSettings(): void {
     } catch {
       // The folder may not exist (no IT policy). Unlock and wake still read the time again.
     }
+  }
+}
+
+/**
+ * "Replace" mode, after the eyes were there for the chosen time: hide the eyes and blur, let the system have its
+ * screen saver and display sleep again, then start the real screen saver or lock the screen.
+ */
+async function runAfterEyes(s: Settings, idleSeconds: number): Promise<void> {
+  afterEyesRunning = true;
+  try {
+    afterEyes.handOff();
+    eventLog(`after the eyes: ${s.afterEyes === 'lock' ? 'locking the screen' : 'starting the screen saver'} (idle ${Math.round(idleSeconds)}s)`);
+    hide();
+    applyScreenSaverMode(s);
+    // Let the eyes and the blur fade out first: they sit above the screen saver level.
+    await new Promise((r) => setTimeout(r, 1500));
+    const done = s.afterEyes === 'lock' ? await lockScreen(InputKinds$.helperPath()) : await startScreenSaver();
+    eventLog(done ? `after the eyes: done (${done})` : 'after the eyes: failed; the eyes stay away until new input');
+  } finally {
+    afterEyesRunning = false;
   }
 }
 
@@ -533,12 +569,29 @@ async function checkIdle(): Promise<void> {
     } else if (s.screenSaver !== 'pause' || idleSeconds < 1) {
       screenSaverActive = false;
     }
-    let blocked = s.paused || screenLocked || overlays.length === 0 || screenSaverActive;
+    // "Replace" mode: after the chosen time, hand over to the real screen saver or lock the screen.
+    const afterStep = afterEyes.update(idleSeconds, afterEyesSeconds(s, systemSaverSeconds));
+    if (afterStep === 'back') {
+      eventLog('after the eyes: input again, the eyes replace the screen saver again');
+      applyScreenSaverMode(s);
+    }
+    if (afterStep === 'due' && !afterEyesRunning && !screenLocked && now - lastAfterEyesCheck >= 5) {
+      lastAfterEyesCheck = now;
+      // Like the system screen saver: wait while another app keeps the display awake (video, presentation).
+      if (s.respectVideoPlayback && (await displaySleepPrevented(ownPids()))) {
+        debugLog('after the eyes: waiting, an app keeps the display awake');
+      } else {
+        void runAfterEyes(s, idleSeconds);
+        return;
+      }
+    }
+    let blocked = s.paused || screenLocked || overlays.length === 0 || screenSaverActive || afterEyes.handedOff;
     const reasons: string[] = [];
     if (s.paused) reasons.push('paused');
     if (screenLocked) reasons.push('screen locked');
     if (overlays.length === 0) reasons.push('no screen selected');
     if (screenSaverActive) reasons.push('screen saver running');
+    if (afterEyes.handedOff) reasons.push(`handed over to the system (${s.afterEyes === 'lock' ? 'screen locked' : 'screen saver'})`);
     // `canShow` is false after the eyes were dismissed (key, mouse onto the eyes, or look-to-close) until new
     // input, so no camera check runs in that time.
     const due = !blocked && idle.canShow(idleSeconds);
@@ -823,6 +876,8 @@ function onSettingsChanged(previous: Settings, next: Settings): void {
   for (const w of blurWindows) if (!w.isDestroyed()) w.webContents.send(IPC.settings, s);
   settingsWindow?.webContents.send(IPC.settings, next);
   if (previous.openAtLogin !== next.openAtLogin) void applyLoginItem(next.openAtLogin);
+  // The hand-over ends when the option is turned off.
+  if (afterEyesSeconds(next, systemSaverSeconds) === null) afterEyes.reset();
   applyScreenSaverMode(next);
   if (idle.isShowing) updateBlur(lastIdleSeconds);
   if (!next.waitWhileWatched && presence.phase !== 'idle') {

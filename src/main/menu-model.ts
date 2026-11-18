@@ -14,6 +14,8 @@ import {
   BLUR_MODES,
   SCREEN_SAVER_MODES,
   SCREEN_SAVER_TIME_PRESETS,
+  AFTER_EYES_ACTIONS,
+  AFTER_EYES_DELAY_PRESETS,
   THEMES,
   type Settings,
 } from '../core/settings';
@@ -198,6 +200,26 @@ export function screenSaverMenu(settings: Settings): MenuNode {
         // Turning it on keeps "always" if that was chosen; otherwise it blurs when replacing the screen saver.
         action: patch({ blur: blurred ? 'off' : 'screensaver' }),
       },
+      { ...afterEyesMenu(settings), enabled: replacing },
+    ],
+  };
+}
+
+/** "Replace" mode: what happens after the eyes were there for a while, and after how long. */
+export function afterEyesMenu(settings: Settings): MenuNode {
+  const actions = presetMenu('', AFTER_EYES_ACTIONS, settings.afterEyes, (a, b) => a === b, (v) => ({ afterEyes: v }));
+  const delays = presetMenu('', AFTER_EYES_DELAY_PRESETS, settings.afterEyesMinutes, (a, b) => a === b, (v) => ({
+    afterEyesMinutes: v,
+  }));
+  const acting = settings.afterEyes !== 'none';
+  return {
+    label: 'After the Eyes',
+    type: 'submenu',
+    submenu: [
+      ...actions.submenu!,
+      separator,
+      { label: 'After the Screen Saver Time, Wait', enabled: false },
+      ...delays.submenu!.map((item) => ({ ...item, enabled: acting && item.enabled !== false })),
     ],
   };
 }
@@ -299,7 +321,6 @@ export function buildMenuModel(
       checked: settings.look.showMouth,
       action: patch({ look: { showMouth: !settings.look.showMouth } }),
     },
-    toggle('Show Text (Welcome / Bored)', settings.showCaptions, 'showCaptions'),
     toggle('Mirror Camera', settings.mirrorCamera, 'mirrorCamera'),
   ];
   if (platform === 'darwin') items.push(toggle("Don't Show During Video", settings.respectVideoPlayback, 'respectVideoPlayback'));

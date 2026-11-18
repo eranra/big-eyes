@@ -135,19 +135,22 @@
       </section>
 
       <section>
-        <h2>Text</h2>
+        <h2>Happy Messages</h2>
         <label class="row check">
-          <input id="showCaptions" type="checkbox" />
-          <span>Show text under the eyes</span>
+          <input id="showInspirations" type="checkbox" />
+          <span>Show happy messages while the eyes are sleeping or bored</span>
         </label>
         <label class="row">
-          <span>When you look at them</span>
-          <input id="welcomeText" type="text" maxlength="40" />
+          <span>Show every</span>
+          <input id="inspirationsInterval" type="range" min="3" max="60" step="1" />
+          <output for="inspirationsInterval"></output>
         </label>
         <label class="row">
-          <span>When you look away</span>
-          <input id="boredText" type="text" maxlength="40" />
+          <span>Stay for</span>
+          <input id="inspirationsDuration" type="range" min="1" max="15" step="1" />
+          <output for="inspirationsDuration"></output>
         </label>
+        <p class="hint">Messages appear in very large text — gray, warm or bright — at the top, center or bottom of the screen. The eyes glance at them.</p>
       </section>
 
       <section>
@@ -173,10 +176,22 @@
           <span>Screen saver starts after</span>
           <select id="screenSaverMinutes"></select>
         </div>
+        <div class="row">
+          <span>After the eyes</span>
+          <select id="afterEyes"></select>
+        </div>
+        <div class="row">
+          <span>Wait after the screen saver time</span>
+          <select id="afterEyesMinutes"></select>
+          <input id="afterEyesCustom" type="number" min="0" max="600" step="1" aria-label="Minutes" hidden />
+          <span id="afterEyesCustomUnit" hidden>min</span>
+        </div>
         <p class="hint">
           In "replace" mode the eyes appear as usual. When the screen saver time is reached, the screen behind them is blurred
           (by default), so nothing on it can be read. "Same as the system" uses your screen saver time, or else the time the
-          display would turn off.
+          display would turn off. After the wait you choose, Big Eyes can start the real screen saver or lock the screen, so
+          the computer is protected while you are away. The screen saver locks only if your system asks for a password after
+          it.
         </p>
         <label class="row">
           <span>Blur strength</span>

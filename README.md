@@ -42,7 +42,9 @@ Look for the 👀 icon in the menu bar. The first time, macOS asks for camera ac
 
 1. Download `Big-Eyes-<version>-arm64.dmg` (Apple silicon) or `Big-Eyes-<version>-x64.dmg` (Intel) from the [Releases page](https://github.com/eranra/big-eyes/releases/latest).
 2. Open it and drag **Big Eyes** onto **Applications**.
-3. The first time, **right-click** Big Eyes in Applications and choose **Open**. (This is needed once, because the app is not from the App Store.)
+3. Open Big Eyes. macOS says it "could not be verified", because the app is not signed by a registered Apple
+   developer. Choose **Done** (not *Move to Trash*), then open **System Settings → Privacy & Security**, scroll down to
+   "Big Eyes was blocked…", and click **Open Anyway**. This is needed once. The one-line installer above avoids it.
 
 </details>
 
@@ -101,7 +103,9 @@ springy movement, expressive eyebrows, and wet-looking highlights.
 - They don't take keyboard focus and don't appear while your screen is locked.
 - By default they stay away while the **screen saver** runs. Or choose *Eyes replace the screen saver*: the eyes
   appear as usual, and when the screen saver would start, the screen behind them becomes **strongly blurred** —
-  on **every** screen, also the ones without eyes (you can turn the blur off).
+  on **every** screen, also the ones without eyes (you can turn the blur off). **After the Eyes** then starts the
+  real screen saver, or locks the screen, after a wait you choose (right away, 1 minute … 1 hour, or any number of
+  minutes in Settings), so the computer is protected while you are away.
 - On macOS they also wait while a video or presentation is playing.
 
 ![Look into the eyes to close them](docs/images/goodbye.png)
@@ -126,6 +130,7 @@ Click the 👀 icon for quick choices, or open **Settings…** for everything, w
 | **Wait while I'm looking** | Don't appear while someone is looking at the screen, even without keyboard or mouse use | On |
 | **Screen saver** | Pause the eyes during the screen saver, or let the eyes replace the screen saver | Pause |
 | **Blur behind the eyes** | When the eyes replace the screen saver: blur on or off, from the screen saver time on. Or blur always. Strength slider | On, full strength, from the screen saver time |
+| **After the eyes** | When the eyes replace the screen saver: keep the eyes, start the real screen saver, or lock the screen — after a wait from the screen saver time: right away, 1, 5, 10, 15, 30 minutes, 1 hour, or any number of minutes (Settings → *Other…*). The screen saver locks only if the system asks for a password after it. Waits while a call or video keeps the display awake | Start the screen saver, 5 minutes |
 | **Screen saver starts after** | Same as the system, or 5 min … 1 hour. "Same as the system" reads the screen saver time once at start and again when it changes: macOS IT policy or System Settings (else display sleep), Windows group policy or screen saver (else monitor off), Linux GNOME or KDE | Same as the system |
 | **Updates** | Check for new versions automatically | On |
 | **Screens** | Built-in screen, main screen, all screens, or the ones you pick | Built-in screen |

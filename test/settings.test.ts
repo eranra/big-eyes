@@ -9,7 +9,7 @@ describe('defaults', () => {
     expect(d.cameras).toEqual({ mode: 'builtin' });
     expect(d.mood.smileBack).toBe(true);
     expect(d.look.showMouth).toBe(true);
-    expect(d.showCaptions).toBe(false);
+    expect(d.showInspirations).toBe(true);
     expect(matchingTheme(d)).toBe('classic');
   });
 });
@@ -78,7 +78,8 @@ describe('settings validation', () => {
       eyeSize: 99,
       backgroundDim: -1,
       irisColor: 'red',
-      welcomeText: 'x'.repeat(100),
+      inspirationsInterval: 1,
+      inspirationsDuration: 100,
       screens: { mode: 'selected', ids: [3, 3, 'a', 4.5, 7] },
       unknownKey: true,
     });
@@ -87,7 +88,8 @@ describe('settings validation', () => {
     expect(normalizeSettings({ eyeSize: 0.01 }).eyeSize).toBe(0.2);
     expect(s.backgroundDim).toBe(0);
     expect(s.irisColor).toBe(defaultSettings().irisColor);
-    expect(s.welcomeText).toHaveLength(40);
+    expect(s.inspirationsInterval).toBe(3);
+    expect(s.inspirationsDuration).toBe(30);
     expect(s.screens).toEqual({ mode: 'selected', ids: [3, 7] });
     expect('unknownKey' in s).toBe(false);
   });

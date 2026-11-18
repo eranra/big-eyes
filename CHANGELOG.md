@@ -3,7 +3,28 @@
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and versions follow [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.5.0] - 2026-11-18
+
+### Added
+
+- **Happy Messages** — when the eyes are sleeping or bored (nobody nearby), a happy, motivational message appears
+  in very large text. It shows at the top, center or bottom of the screen, in different sizes and soft colors (gray,
+  warm gray, bright). The eyes glance at it. Shown in both normal idle and blur / screen saver modes. On by default;
+  configure in **Settings → Happy Messages** (show every 3–60 s, stay 1–15 s).
+- **After the Eyes** (when the eyes replace the screen saver): after a wait you choose, Big Eyes starts the real
+  screen saver or locks the screen, so the computer is protected while you are away. The wait counts from the screen
+  saver time: right away, 1, 5, 10, 15, 30 minutes, 1 hour, or any number of minutes in Settings. Default: start the
+  screen saver after 5 minutes. Like the system screen saver, it waits while a call or video keeps the display awake.
+  Works on macOS, Windows and Linux.
+
+### Removed
+
+- The old **Text** captions ("Welcome" / "Bored" under the eyes) are removed. Happy Messages replace them.
+
+### Fixed
+
+- The macOS install steps in the README: "right-click → Open" no longer works on macOS 15 and later. The steps now
+  use **Open Anyway** in System Settings.
 
 ## [0.4.1] - 2026-11-08
 

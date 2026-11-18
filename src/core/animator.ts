@@ -2,6 +2,7 @@ import type { PersonState } from './attention';
 import { MultiCameraAttention, type OpenCamera } from './multicamera';
 import { BlinkScheduler } from './blink';
 import type { FaceObservation } from './face';
+import { InspirationScheduler, type ActiveInspiration, type InspirationSettings } from './inspirations';
 import { add, clamp, clampLength, lerpVec, scale, SeededRandom, type Vec2 } from './math';
 import { MoodMachine, type Mood } from './mood';
 import { defaultSettings, type Settings } from './settings';
@@ -49,6 +50,8 @@ export interface EyePose {
   /** Mouth opacity, 0..1 (0 when the mouth is turned off). */
   mouthOpacity: number;
   mood: Mood;
+  /** Happy message shown while sleeping/bored, or null. */
+  inspiration: ActiveInspiration | null;
 }
 
 /** Target look of each mood. The animator moves toward these values with springs. */
@@ -138,12 +141,15 @@ export class EyeAnimator {
   /** Time the goodbye wink started. */
   private goodbyeAt: number | null = null;
 
+  readonly inspirations: InspirationScheduler;
   private fixation: Vec2 = { x: 0, y: 0 };
   private nextSaccadeAt = 0;
   private captionText = '';
   private readonly startTime: number;
   private lastTime: number | null = null;
   private readonly phase: number;
+  private inspirationGlanceUntil = 0;
+  private inspirationGaze: Vec2 | null = null;
 
   constructor(settings: Settings = defaultSettings(), seed = 42, now = 0) {
     this.settings = settings;
@@ -151,6 +157,7 @@ export class EyeAnimator {
     this.moods = new MoodMachine(settings.mood, 'curious', now);
     this.blinks = new BlinkScheduler(seed + 1, now);
     this.rng = new SeededRandom(seed);
+    this.inspirations = new InspirationScheduler(settings as InspirationSettings, seed + 2);
     this.startTime = now;
     this.phase = this.rng.range(0, Math.PI * 2);
     this.pose = this.buildPose(0);
@@ -169,6 +176,7 @@ export class EyeAnimator {
     this.settings = settings;
     this.attention.apply(settings.attention, settings.mirrorCamera, settings.calibrations);
     this.moods.settings = settings.mood;
+    this.inspirations.settings = settings as InspirationSettings;
   }
 
   /** Faces from the cameras. `cameras` = indexes of cameras that sent a frame now (also with no face). */
@@ -199,10 +207,24 @@ export class EyeAnimator {
     const mood = this.moods.mood;
     const shape = MOOD_SHAPES[mood];
 
-    this.updateFixation(person, mood, now);
+    const eligible = mood === 'sleeping' || mood === 'bored';
+    const inspiration = this.inspirations.update(now, eligible);
+    const prevInsp = this.pose.inspiration;
+    if (inspiration && (!prevInsp || inspiration.text !== prevInsp.text)) {
+      this.startInspirationGlance(inspiration, now);
+    }
 
-    const tremor = { x: Math.sin(now * 13.1 + this.phase) * 0.006, y: Math.cos(now * 11.3 + this.phase) * 0.006 };
-    this.gaze.setTarget(add(this.fixation, tremor));
+    this.updateFixation(person, mood, now, inspiration);
+
+    if (this.inspirationGaze && (now < this.inspirationGlanceUntil || inspiration)) {
+      const gazeTarget = this.inspirationGaze;
+      const tremor = { x: Math.sin(now * 13.1 + this.phase) * 0.006, y: Math.cos(now * 11.3 + this.phase) * 0.006 };
+      this.gaze.setTarget(add(gazeTarget, tremor));
+    } else {
+      if (now >= this.inspirationGlanceUntil) this.inspirationGaze = null;
+      const tremor = { x: Math.sin(now * 13.1 + this.phase) * 0.006, y: Math.cos(now * 11.3 + this.phase) * 0.006 };
+      this.gaze.setTarget(add(this.fixation, tremor));
+    }
     this.gaze.step(dt);
 
     // The eye pair floats, and leans toward the person so it stays in front of them.
@@ -263,23 +285,19 @@ export class EyeAnimator {
     this.blinks.enabled = mood !== 'sleeping';
     const blink = this.blinks.closure(now);
 
-    if (mood === 'happy' || mood === 'delighted') this.captionText = this.settings.welcomeText;
-    else if (mood === 'bored') this.captionText = this.settings.boredText;
     if (this.messageOverride !== null) this.captionText = this.messageOverride;
-    const captionWanted =
-      this.messageOverride !== null || (this.settings.showCaptions && (mood === 'happy' || mood === 'delighted' || mood === 'bored'));
-    this.caption.target = captionWanted ? 1 : 0;
+    this.caption.target = this.messageOverride !== null ? 1 : 0;
     this.caption.step(dt);
     this.sleepBubble.target = mood === 'sleeping' ? 1 : 0;
     this.sleepBubble.step(dt);
 
     const breathing =
       Math.sin(t * (mood === 'sleeping' ? 1.1 : 1.6) + this.phase) * (mood === 'sleeping' ? 0.018 : 0.008);
-    this.pose = this.buildPose(blink, breathing);
+    this.pose = this.buildPose(blink, breathing, inspiration);
     return this.pose;
   }
 
-  private buildPose(blink: number, breathing = 0): EyePose {
+  private buildPose(blink: number, breathing = 0, inspiration: ActiveInspiration | null = null): EyePose {
     const lid = clamp(this.upperLid.value, 0, 1);
     return {
       gaze: this.gaze.value,
@@ -291,7 +309,6 @@ export class EyeAnimator {
       smile: clamp(this.smile.value, 0, 1),
       lidTilt: this.lidTilt.value,
       pupilSize: Math.max(this.pupil.value, 0.3),
-      // Brows dip a little during a blink, like real faces.
       browLift: this.browLift.value - blink * 0.12,
       browTilt: this.browTilt.value,
       caption: this.captionText,
@@ -304,6 +321,7 @@ export class EyeAnimator {
       mouthWidth: Math.max(this.mouthWidth.value, 0.2),
       mouthOpacity: clamp(this.mouthAlpha.value, 0, 1),
       mood: this.moods.mood,
+      inspiration,
     };
   }
 
@@ -361,8 +379,18 @@ export class EyeAnimator {
     this.nextSaccadeAt = now;
   }
 
+  private startInspirationGlance(insp: ActiveInspiration, now: number): void {
+    const targets: Record<string, Vec2> = {
+      top: { x: this.rng.range(-0.15, 0.15), y: 0.7 },
+      bottom: { x: this.rng.range(-0.15, 0.15), y: -0.6 },
+      center: { x: this.rng.range(-0.3, 0.3), y: this.rng.range(-0.1, 0.3) },
+    };
+    this.inspirationGaze = targets[insp.position] ?? { x: 0, y: 0 };
+    this.inspirationGlanceUntil = now + this.rng.range(1.2, 2.5);
+  }
+
   /** Chooses where to look and when to jump to a new point. */
-  private updateFixation(person: PersonState, mood: Mood, now: number): void {
+  private updateFixation(person: PersonState, mood: Mood, now: number, _inspiration?: ActiveInspiration | null): void {
     const following = person.isPresent && mood !== 'sleeping' && mood !== 'bored';
     if (following) {
       const target = clampLength(person.position, 1);
@@ -407,7 +435,6 @@ export class EyeAnimator {
 }
 
 
-/** A resting pose for a mood, without any animation. Used for previews and snapshots. */
 export function staticPose(mood: Mood, settings: Settings = defaultSettings()): EyePose {
   const s = MOOD_SHAPES[mood];
   return {
@@ -422,8 +449,8 @@ export function staticPose(mood: Mood, settings: Settings = defaultSettings()): 
     browLift: s.browLift,
     browTilt: s.browTilt,
     squash: 0,
-    caption: mood === 'happy' || mood === 'delighted' ? settings.welcomeText : mood === 'bored' ? settings.boredText : '',
-    captionOpacity: settings.showCaptions && (mood === 'happy' || mood === 'delighted' || mood === 'bored') ? 1 : 0,
+    caption: '',
+    captionOpacity: 0,
     sleepOpacity: mood === 'sleeping' ? 1 : 0,
     closeProgress: 0,
     wink: 0,
@@ -432,5 +459,6 @@ export function staticPose(mood: Mood, settings: Settings = defaultSettings()): 
     mouthWidth: s.mouth.width,
     mouthOpacity: settings.look.showMouth ? 1 : 0,
     mood,
+    inspiration: null,
   };
 }

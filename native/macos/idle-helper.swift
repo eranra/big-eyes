@@ -7,8 +7,29 @@
 //
 // It reads only these counters (no event contents, no key values) and needs no permissions.
 // Usage: idle-helper [interval-seconds]   (default 0.1). It exits when its parent closes stdin or stdout.
+//
+// Other commands, used by "Eyes replace the screen saver" -> "Lock the Screen":
+//   idle-helper --lock       locks the screen now (the same lock as Control-Command-Q), then exits.
+//   idle-helper --can-lock   exits with 0 if the lock function exists (for tests; does not lock).
 import CoreGraphics
 import Foundation
+
+/// The system lock function (login.framework). Not a public API, so it is looked up at run time.
+func lockFunction() -> (@convention(c) () -> Int32)? {
+  let framework = "/System/Library/PrivateFrameworks/login.framework/Versions/Current/login"
+  guard let handle = dlopen(framework, RTLD_NOW), let symbol = dlsym(handle, "SACLockScreenImmediate") else { return nil }
+  return unsafeBitCast(symbol, to: (@convention(c) () -> Int32).self)
+}
+
+switch CommandLine.arguments.dropFirst().first {
+case "--lock":
+  guard let lock = lockFunction() else { exit(2) }
+  exit(lock() == 0 ? 0 : 3)
+case "--can-lock":
+  exit(lockFunction() == nil ? 2 : 0)
+default:
+  break
+}
 
 let source = CGEventSourceStateID.combinedSessionState
 func since(_ types: [CGEventType]) -> Double {
