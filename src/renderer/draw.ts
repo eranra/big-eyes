@@ -599,30 +599,38 @@ function drawSleep(ctx: CanvasRenderingContext2D, l: EyeLayout, pose: EyePose, t
   ctx.restore();
 }
 
-function drawInspiration(ctx: CanvasRenderingContext2D, width: number, height: number, pose: EyePose, _time: number, _layout: EyeLayout): void {
+function drawInspiration(ctx: CanvasRenderingContext2D, width: number, height: number, pose: EyePose, time: number, _layout: EyeLayout): void {
   const insp = pose.inspiration;
   if (!insp) return;
   const alpha = Math.min(1, Math.max(0, insp.opacity));
   if (alpha < 0.01) return;
   const baseColor = INSPIRATION_COLORS[insp.colorIndex % INSPIRATION_COLORS.length] ?? INSPIRATION_COLORS[0]!;
   const colorWithAlpha = baseColor.replace(/1\)$/, `${(0.95 * alpha).toFixed(3)})`);
-  const size = Math.max(32, Math.min(width * 0.055, height * 0.07)) * insp.sizeFactor;
+  const size = Math.max(42, Math.min(width * 0.09, height * 0.11)) * insp.sizeFactor;
   const yPositions: Record<string, number> = {
-    top: height * 0.12,
+    top: height * 0.15,
     center: height * 0.5,
-    bottom: height * 0.88,
+    bottom: height * 0.85,
   };
-  const y = yPositions[insp.position] ?? height * 0.12;
-  const lift = (1 - alpha) * 16;
+  const baseY = yPositions[insp.position] ?? height * 0.15;
+  const lift = (1 - alpha) * 12;
+  const elapsed = time - insp.startTime;
+  const driftY = Math.sin(elapsed * 0.7) * height * 0.02;
+  const driftX = Math.sin(elapsed * 0.5) * width * 0.015;
+  const y = baseY + driftY + lift;
+  const x = width / 2 + driftX;
   ctx.save();
-  ctx.font = `700 ${size}px ui-rounded, "SF Pro Rounded", "Nunito", "Segoe UI", system-ui, sans-serif`;
+  ctx.font = `800 ${size}px ui-rounded, "SF Pro Rounded", "Nunito", "Segoe UI", system-ui, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.letterSpacing = `${size * 0.04}px`;
-  ctx.shadowColor = `rgba(0, 0, 0, ${0.5 * alpha})`;
-  ctx.shadowBlur = size * 0.6;
+  ctx.letterSpacing = `${size * 0.02}px`;
+  ctx.shadowColor = `rgba(0, 0, 0, ${0.65 * alpha})`;
+  ctx.shadowBlur = size * 0.5;
+  ctx.lineWidth = Math.max(2, size * 0.06);
+  ctx.strokeStyle = `rgba(0, 0, 0, ${0.35 * alpha})`;
   ctx.fillStyle = colorWithAlpha;
-  ctx.fillText(insp.text, width / 2, y + lift);
+  ctx.strokeText(insp.text, x, y);
+  ctx.fillText(insp.text, x, y);
   ctx.restore();
 }
 

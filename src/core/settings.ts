@@ -544,7 +544,7 @@ export function defaultSettings(): Settings {
     look: { ...THEMES[0]!.look },
     showInspirations: true,
     inspirationsInterval: 10,
-    inspirationsDuration: 5,
+    inspirationsDuration: 8,
     mirrorCamera: false,
     respectVideoPlayback: true,
     openAtLogin: false,

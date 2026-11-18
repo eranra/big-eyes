@@ -42,17 +42,20 @@ export interface ActiveInspiration {
   opacity: number;
   colorIndex: number;
   sizeFactor: number;
+  startTime: number;
 }
 
 export const INSPIRATION_COLORS: readonly string[] = [
-  'rgba(220, 220, 220, 1)',
-  'rgba(200, 205, 215, 1)',
-  'rgba(235, 225, 200, 1)',
-  'rgba(210, 215, 225, 1)',
-  'rgba(240, 220, 210, 1)',
-  'rgba(195, 200, 210, 1)',
-  'rgba(230, 235, 245, 1)',
-  'rgba(225, 215, 195, 1)',
+  'rgba(255, 220, 80, 1)',
+  'rgba(255, 100, 120, 1)',
+  'rgba(80, 220, 255, 1)',
+  'rgba(255, 160, 60, 1)',
+  'rgba(120, 255, 140, 1)',
+  'rgba(255, 110, 200, 1)',
+  'rgba(100, 160, 255, 1)',
+  'rgba(255, 240, 100, 1)',
+  'rgba(80, 255, 200, 1)',
+  'rgba(255, 90, 90, 1)',
 ];
 
 export const INSPIRATION_POSITIONS: readonly InspirationPosition[] = ['top', 'bottom', 'center'];
@@ -96,8 +99,7 @@ export class InspirationScheduler {
     }
 
     const { inspirationsInterval: interval, inspirationsDuration: duration } = this.settings;
-    const fadeTime = 0.8;
-    const visibleTime = Math.max(0.5, duration - fadeTime * 2);
+    const fadeTime = 0.6;
 
     if (this.phase === 'idle') {
       const idleElapsed = now - this.phaseStart;
@@ -109,7 +111,8 @@ export class InspirationScheduler {
 
     if (this.phase === 'showing') {
       const elapsed = now - this.messageStart;
-      if (elapsed >= visibleTime) {
+      const showFor = Math.max(fadeTime + 0.5, duration - fadeTime);
+      if (elapsed >= showFor) {
         this.phase = 'fadingOut';
         this.phaseStart = now;
       }
@@ -143,7 +146,8 @@ export class InspirationScheduler {
       position: this.rng.pick([...INSPIRATION_POSITIONS]),
       opacity: 0,
       colorIndex: Math.floor(this.rng.next() * INSPIRATION_COLORS.length),
-      sizeFactor: this.rng.range(0.85, 1.35),
+      sizeFactor: this.rng.range(1.15, 1.6),
+      startTime: now,
     };
     this.phase = 'showing';
     this.phaseStart = now;
