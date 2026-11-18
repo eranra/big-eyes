@@ -3,6 +3,12 @@
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.5.3] - 2026-11-18
+
+### Changed
+
+- **Cartoon mouth:** filled Pixar-soft lips with highlight, distinct shapes per mood, and a subtle alive wobble.
+
 ## [0.5.2] - 2026-11-18
 
 ### Changed
