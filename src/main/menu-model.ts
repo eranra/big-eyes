@@ -263,6 +263,50 @@ export function closingMenu(settings: Settings): MenuNode {
   return { label: 'Closing', type: 'submenu', submenu: items };
 }
 
+export function inspirationsMenu(settings: Settings): MenuNode {
+  const interval = presetMenu(
+    'Show Every',
+    [
+      { label: '3 seconds', value: 3 },
+      { label: '5 seconds', value: 5 },
+      { label: '10 seconds', value: 10 },
+      { label: '15 seconds', value: 15 },
+      { label: '30 seconds', value: 30 },
+      { label: '1 minute', value: 60 },
+    ],
+    settings.inspirationsInterval,
+    near,
+    (v) => ({ inspirationsInterval: v }),
+  );
+  const duration = presetMenu(
+    'Stay For',
+    [
+      { label: '2 seconds', value: 2 },
+      { label: '5 seconds', value: 5 },
+      { label: '8 seconds', value: 8 },
+      { label: '12 seconds', value: 12 },
+    ],
+    settings.inspirationsDuration,
+    near,
+    (v) => ({ inspirationsDuration: v }),
+  );
+  return {
+    label: 'Happy Messages',
+    type: 'submenu',
+    submenu: [
+      {
+        label: 'Show Happy Messages',
+        type: 'checkbox',
+        checked: settings.showInspirations,
+        action: patch({ showInspirations: !settings.showInspirations }),
+      },
+      separator,
+      { ...interval, enabled: settings.showInspirations },
+      { ...duration, enabled: settings.showInspirations },
+    ],
+  };
+}
+
 export function themeMenu(settings: Settings): MenuNode {
   const current = matchingTheme(settings);
   const items: MenuNode[] = THEMES.map((t) => ({
@@ -308,6 +352,7 @@ export function buildMenuModel(
     closingMenu(settings),
     cameraMenu(settings, cameras),
     screensMenu(settings, displays),
+    inspirationsMenu(settings),
     separator,
     {
       label: 'Smile Back When You Smile',
