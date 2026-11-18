@@ -114,8 +114,8 @@ const numberFields: Record<NumberField, (v: number) => string> = {
   backgroundDim: (v) => (v === 0 ? 'none' : `${Math.round(v * 100)}%`),
   idleTimeout: formatSeconds,
 };
-type BoolField = 'showInspirations' | 'respectVideoPlayback' | 'openAtLogin' | 'paused' | 'mirrorCamera' | 'showDebugInfo' | 'waitWhileWatched';
-const boolFields: BoolField[] = ['showInspirations', 'respectVideoPlayback', 'openAtLogin', 'paused', 'mirrorCamera', 'showDebugInfo', 'waitWhileWatched'];
+type BoolField = 'showInspirations' | 'showHands' | 'respectVideoPlayback' | 'openAtLogin' | 'paused' | 'mirrorCamera' | 'showDebugInfo' | 'waitWhileWatched';
+const boolFields: BoolField[] = ['showInspirations', 'showHands', 'respectVideoPlayback', 'openAtLogin', 'paused', 'mirrorCamera', 'showDebugInfo', 'waitWhileWatched'];
 
 let saveTimer = 0;
 function save(patch: Record<string, unknown>, delay = 150): void {

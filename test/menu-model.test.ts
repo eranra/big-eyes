@@ -29,6 +29,11 @@ describe('tray menu model', () => {
     expect(checked(find(menu, 'Background'))).toEqual(['Light']);
   });
 
+  it('menu shows hands toggle', () => {
+    const menu = buildMenuModel({ ...defaultSettings(), showHands: true }, [], [], 'darwin');
+    expect(JSON.stringify(menu)).toContain('Hands');
+  });
+
   it('shows Custom when the value is not a preset', () => {
     const s = mergeSettings(defaultSettings(), { eyeSize: 1.1 });
     const size = find(buildMenuModel(s, [], [], 'darwin'), 'Eye Size');

@@ -13,6 +13,7 @@ src/
     mood.ts        PersonState over time -> Mood (sleeping, surprised, curious, happy, bored)
     blink.ts       natural blink timing
     animator.ts    Mood + PersonState -> EyePose for every frame
+    hand.ts        mood -> hand gesture (wave, clap, cover, point, droop)
     idle.ts        system idle time -> show / hide
     settings.ts    settings type, defaults, themes, validation, screen selection
     camera.ts      which camera to open (saved id, saved name, built-in camera)

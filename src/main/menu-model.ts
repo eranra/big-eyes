@@ -318,6 +318,23 @@ export function themeMenu(settings: Settings): MenuNode {
   return { label: 'Look', type: 'submenu', submenu: items };
 }
 
+/** Hands at the bottom edge: on/off, with the gestures they do per mood. */
+export function handsMenu(settings: Settings): MenuNode {
+  return {
+    label: 'Hands',
+    type: 'submenu',
+    submenu: [
+      toggle('Show Hands', settings.showHands, 'showHands'),
+      separator,
+      { label: 'Wave while sleeping', enabled: false },
+      { label: 'Clap when happy', enabled: false },
+      { label: 'Cover the mouth when surprised', enabled: false },
+      { label: 'Point at happy messages', enabled: false },
+      { label: 'Droop when bored', enabled: false },
+    ],
+  };
+}
+
 const toggle = (label: string, checked: boolean, key: keyof Settings): MenuNode => ({
   label,
   type: 'checkbox',
@@ -352,6 +369,7 @@ export function buildMenuModel(
     cameraMenu(settings, cameras),
     screensMenu(settings, displays),
     inspirationsMenu(settings),
+    handsMenu(settings),
     separator,
     {
       label: 'Smile Back When You Smile',

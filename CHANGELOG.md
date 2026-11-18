@@ -3,6 +3,14 @@
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.6.0] - 2026-11-19
+
+### Added
+
+- **Hands** — optional cartoon hands below the eyes (off by default; turn on in **Look → Hands** or the tray's
+  **Hands** menu). They wave while sleeping, clap when happy, cover the mouth when surprised, point at happy
+  messages, and droop when bored, with a gentle idle sway.
+
 ## [0.5.3] - 2026-11-18
 
 ### Changed
