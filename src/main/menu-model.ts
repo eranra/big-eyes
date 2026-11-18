@@ -270,8 +270,7 @@ export function inspirationsMenu(settings: Settings): MenuNode {
       { label: '3 seconds', value: 3 },
       { label: '5 seconds', value: 5 },
       { label: '10 seconds', value: 10 },
-      { label: '15 seconds', value: 15 },
-      { label: '30 seconds', value: 30 },
+      { label: '20 seconds', value: 20 },
       { label: '1 minute', value: 60 },
     ],
     settings.inspirationsInterval,
@@ -281,10 +280,10 @@ export function inspirationsMenu(settings: Settings): MenuNode {
   const duration = presetMenu(
     'Stay For',
     [
-      { label: '2 seconds', value: 2 },
       { label: '5 seconds', value: 5 },
-      { label: '8 seconds', value: 8 },
-      { label: '12 seconds', value: 12 },
+      { label: '10 seconds', value: 10 },
+      { label: '20 seconds', value: 20 },
+      { label: '30 seconds', value: 30 },
     ],
     settings.inspirationsDuration,
     near,

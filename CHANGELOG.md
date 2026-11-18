@@ -3,6 +3,12 @@
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.5.2] - 2026-11-18
+
+### Changed
+
+- **Happy Messages:** gap options 3, 5, 10, 20 s and 1 min; shown-for options 5, 10, 20, 30 s.
+
 ## [0.5.1] - 2026-11-18
 
 ### Changed
