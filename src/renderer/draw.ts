@@ -134,7 +134,7 @@ export function drawEyes(ctx: CanvasRenderingContext2D, width: number, height: n
     if (look.showBrows) drawBrow(ctx, cx, l.cy, l.rx, l.ry, side, pose, look.browColor);
   }
   if (pose.mouthOpacity > 0.01) drawMouth(ctx, l, pose, look.mouthColor);
-  if (pose.hands.opacity > 0.01) drawHands(ctx, l, pose, look.mouthColor);
+  if (pose.hands.opacity > 0.01) drawHands(ctx, width, l, pose, look.lidColor);
   drawCaption(ctx, l, pose, look.glowColor);
   if (pose.inspiration && pose.inspiration.opacity > 0.01) drawInspiration(ctx, width, height, pose, o.time, l);
   if (pose.sleepOpacity > 0.01) drawSleep(ctx, l, pose, o.time);
@@ -668,68 +668,80 @@ function drawSleep(ctx: CanvasRenderingContext2D, l: EyeLayout, pose: EyePose, t
   ctx.restore();
 }
 
-export function handPlace(l: EyeLayout): { x: number; y: number; halfWidth: number } {
-  const mx = mouthPlace(l);
-  return { x: mx.x, y: mx.y + l.ry * 0.55, halfWidth: l.spacing * 0.55 };
+/** Where the hands sit: to the sides of the eyes, about the eyes' height. */
+export function handPlace(l: EyeLayout): { y: number; halfWidth: number } {
+  return { y: l.cy + l.ry * 0.1, halfWidth: l.spacing * 1.7 + l.rx * 1.25 };
 }
 
-export function drawHands(ctx: CanvasRenderingContext2D, l: EyeLayout, pose: EyePose, color: string): void {
+/**
+ * Kid-friendly mitten hands at the sides. Chunky palm, three stubby fingers and a thumb,
+ * drawn from the theme's skin (lid) color so they match the character.
+ */
+export function drawHands(ctx: CanvasRenderingContext2D, width: number, l: EyeLayout, pose: EyePose, skinColor: string): void {
   const hp = pose.hands;
   if (!hp || hp.opacity < 0.01) return;
   const p = handPlace(l);
-  const skin = shade(color, 0.55);
-  const skinDark = shade(color, 0.25);
-  ctx.save();
-  ctx.globalAlpha = hp.opacity;
-  const palmW = l.rx * 0.7;
-  const palmH = l.rx * 0.55;
-  const spacing = l.spacing * 0.55;
-  const yJ = hp.yJitter;
-  const fingerW = palmW * 0.11;
-  const fingerGap = fingerW * 0.35;
-  function drawHand(cx: number, cy: number, mirrored: number): void {
+  const skin = shade(skinColor, 0.35);
+  const skinLight = shade(skinColor, 0.6);
+  const skinDark = shade(skinColor, -0.1);
+  const palmR = Math.max(l.rx * 0.6, 12);
+  const fingerW = palmR * 0.42;
+  const outline = Math.max(2, palmR * 0.09);
+  const margin = palmR * 1.35;
+  // Clap and cover pull the hands toward the middle; the rest keep their side spot.
+  const pull =
+    (hp.gesture === 'clap' ? hp.spread : hp.gesture === 'cover' ? 0.55 : hp.gesture === 'point' ? 0.2 : 0) *
+    p.halfWidth *
+    0.75;
+
+  const drawHand = (side: -1 | 1): void => {
+    const x = clampNumber(l.cx + side * (p.halfWidth - pull), margin, Math.max(margin, width - margin));
+    const y = p.y + hp.yJitter;
+    const pointing = hp.gesture === 'point' && side === 1;
     ctx.save();
-    ctx.translate(cx, cy + yJ);
-    ctx.rotate((hp.rotation * Math.PI) / 180 * mirrored);
-    ctx.translate(0, -hp.lift * l.ry * 0.6);
+    ctx.globalAlpha = hp.opacity;
+    ctx.translate(x, y);
+    ctx.rotate((side * hp.rotation * Math.PI) / 180);
+    ctx.translate(0, -hp.lift * palmR);
+    // Arm stump toward the bottom.
+    ctx.fillStyle = skinDark;
+    ctx.beginPath();
+    ctx.roundRect(-fingerW * 0.62, palmR * 0.3, fingerW * 1.24, palmR * 1.5, fingerW * 0.62);
+    ctx.fill();
+    // Palm: a chubby round blob.
     ctx.fillStyle = skin;
     ctx.strokeStyle = skinDark;
-    ctx.lineWidth = Math.max(1, l.rx * 0.02);
+    ctx.lineWidth = outline;
     ctx.beginPath();
-    ctx.ellipse(0, 0, palmW * 0.5, palmH * 0.5, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, 0, palmR * 0.94, palmR, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
-    const spreadFactor = 1 + hp.spread * 1.2;
-    const totalW = 4 * fingerW + 3 * fingerGap * spreadFactor;
-    let fx = -totalW / 2 + fingerW / 2;
-    for (let i = 0; i < 4; i++) {
-      const fh = palmH * (0.55 + (i === 1 ? 0.12 : i === 2 ? 0.1 : 0));
-      ctx.fillStyle = skin;
+    // Three stubby fingers, the middle one a little taller (and longer still when pointing).
+    for (const i of [-1, 0, 1]) {
+      const fx = i * fingerW * (1 + hp.spread * 0.45);
+      const fh = palmR * (i === 0 ? 0.6 : 0.48) + (pointing && i === 0 ? palmR * 0.45 : 0);
       ctx.beginPath();
-      ctx.roundRect(fx - fingerW / 2, -palmH * 0.5 - fh, fingerW, fh, fingerW / 2);
+      ctx.roundRect(fx - fingerW * 0.5, -palmR * 0.82 - fh, fingerW, fh + palmR * 0.4, fingerW * 0.5);
+      ctx.fillStyle = skin;
       ctx.fill();
       ctx.stroke();
-      fx += fingerW + fingerGap * spreadFactor;
     }
+    // Thumb toward the face.
     ctx.beginPath();
-    ctx.ellipse(mirrored * palmW * 0.35, palmH * 0.1, fingerW * 0.9, fingerW * 0.7, mirrored * 0.6, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
-  }
-  drawHand(p.x - spacing, p.y, -1);
-  drawHand(p.x + spacing, p.y, 1);
-  // pointing finger hint when gesture is point
-  if (hp.gesture === 'point') {
+    ctx.ellipse(-side * palmR * 0.82, palmR * 0.28, fingerW * 0.55, fingerW * 0.85, -side * 0.6, 0, Math.PI * 2);
     ctx.fillStyle = skin;
-    ctx.strokeStyle = skinDark;
-    ctx.lineWidth = Math.max(1, l.rx * 0.02);
-    ctx.beginPath();
-    ctx.roundRect(p.x - fingerW / 2, p.y - palmH * 0.5 - palmH * 0.7 + yJ - hp.lift * l.ry * 0.6, fingerW, palmH * 0.7, fingerW / 2);
     ctx.fill();
     ctx.stroke();
-  }
-  ctx.restore();
+    // A soft round highlight makes the palm look squishy and cute.
+    ctx.fillStyle = skinLight;
+    ctx.globalAlpha = hp.opacity * 0.85;
+    ctx.beginPath();
+    ctx.ellipse(side * palmR * 0.18, palmR * 0.28, palmR * 0.36, palmR * 0.24, side * 0.35, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  };
+  drawHand(-1);
+  drawHand(1);
 }
 
 function wrapLines(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {

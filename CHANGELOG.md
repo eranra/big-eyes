@@ -3,6 +3,14 @@
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.6.1] - 2026-11-19
+
+### Changed
+
+- **Hands, new look and place:** kid-friendly mitten hands — a chubby round palm with three stubby fingers,
+  a thumb and a squishy highlight, colored like the character's skin. They now sit to the sides of the eyes at
+  about eye height (before: below the mouth), wave more visibly, and pull toward the middle to clap or cover.
+
 ## [0.6.0] - 2026-11-19
 
 ### Added

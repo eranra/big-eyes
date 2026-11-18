@@ -49,7 +49,7 @@ export class HandScheduler {
     let rotation = 0;
     if (gesture === 'wave') {
       lift = Math.sin(now * 1.4) * 0.25 + 0.35;
-      rotation = Math.sin(now * 1.4) * 8;
+      rotation = Math.sin(now * 1.4) * 14;
     } else if (gesture === 'clap') {
       spread = Math.abs(Math.sin(now * 3.5)) * 0.5 + 0.1;
       lift = 0.3;
