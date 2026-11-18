@@ -3,6 +3,12 @@
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.5.1] - 2026-11-18
+
+### Changed
+
+- **Happy Messages:** stronger, more vivid colors that change each time; much larger text with a dark outline that fills more of the screen; gentle floating movement; true 8-second display time (fixed timing); long messages wrap into multiple lines; also available in the tray menu.
+
 ## [0.5.0] - 2026-11-18
 
 ### Added
@@ -10,7 +16,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - **Happy Messages** — when the eyes are sleeping or bored (nobody nearby), a happy, motivational message appears
   in very large text. It shows at the top, center or bottom of the screen, in different sizes and soft colors (gray,
   warm gray, bright). The eyes glance at it. Shown in both normal idle and blur / screen saver modes. On by default;
-  configure in **Settings → Happy Messages** (show every 3–60 s, stay 1–15 s).
+  configure in **Settings → Happy Messages** (show every 3–60 s, stay 1–15 s) and in the tray menu.
 - **After the Eyes** (when the eyes replace the screen saver): after a wait you choose, Big Eyes starts the real
   screen saver or locks the screen, so the computer is protected while you are away. The wait counts from the screen
   saver time: right away, 1, 5, 10, 15, 30 minutes, 1 hour, or any number of minutes in Settings. Default: start the
