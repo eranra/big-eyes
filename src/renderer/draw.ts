@@ -156,29 +156,37 @@ function drawMouth(ctx: CanvasRenderingContext2D, l: EyeLayout, pose: EyePose, c
   const smile = pose.mouthSmile;
   const open = pose.mouthOpen;
   const scaleY = l.ry * 0.5;
-  // Corner height: smiling lifts the corners. Middle dips down a bit more when smiling, like a real smile.
-  const cornerY = m.y - smile * scaleY * 0.45;
-  const midUpper = m.y + smile * scaleY * 0.15 - open * scaleY * 0.1;
-  const midLower = m.y + smile * scaleY * 0.55 + open * scaleY * (0.55 + 0.35 * Math.max(smile, 0));
+  const alive = (pose as unknown as { mouthAlive?: number }).mouthAlive ?? 0;
+  const aliveY = alive * scaleY * 0.5;
+  const cornerY = m.y - smile * scaleY * 0.45 + aliveY;
+  const midUpper = m.y + smile * scaleY * 0.15 - open * scaleY * 0.1 + aliveY * 0.5;
+  const midLower = m.y + smile * scaleY * 0.55 + open * scaleY * (0.55 + 0.35 * Math.max(smile, 0)) + aliveY * 0.3;
   const left = m.x - w;
   const right = m.x + w;
   const thickness = Math.max(3, l.rx * 0.07);
+  const thinStroke = thickness * 0.6;
 
   ctx.save();
   ctx.globalAlpha = pose.mouthOpacity;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-  // An open mouth without a smile is a round "o" (surprised). Blend toward it as the smile goes to zero.
   const oval = open > 0.3 ? 1 - Math.min(1, Math.abs(smile) / 0.35) : 0;
   if (oval > 0.5) {
     const ow = w * 0.55;
     const oh = scaleY * (0.25 + 0.55 * open);
+    const lipFill = shade(color, 0);
+    ctx.beginPath();
+    ctx.ellipse(m.x, m.y + oh * 0.3, ow * 1.18, oh * 1.18, 0, 0, Math.PI * 2);
+    ctx.fillStyle = lipFill;
+    ctx.fill();
     ctx.beginPath();
     ctx.ellipse(m.x, m.y + oh * 0.3, ow, oh, 0, 0, Math.PI * 2);
     ctx.fillStyle = 'rgb(58, 16, 30)';
     ctx.fill();
     ctx.strokeStyle = shade(color, 0);
-    ctx.lineWidth = thickness;
+    ctx.lineWidth = thinStroke;
+    ctx.beginPath();
+    ctx.ellipse(m.x, m.y + oh * 0.3, ow * 1.18, oh * 1.18, 0, 0, Math.PI * 2);
     ctx.stroke();
     ctx.restore();
     return;
@@ -187,17 +195,54 @@ function drawMouth(ctx: CanvasRenderingContext2D, l: EyeLayout, pose: EyePose, c
     ctx.moveTo(left, cornerY);
     ctx.bezierCurveTo(left + w * 0.45, midUpper, right - w * 0.45, midUpper, right, cornerY);
   };
-  if (open > 0.06) {
-    // Inside of the mouth.
+  const lowerPath = (): void => {
+    ctx.bezierCurveTo(right - w * 0.35, midLower, left + w * 0.35, midLower, left, cornerY);
+  };
+  const closedLipTop = m.y + smile * scaleY * 0.08;
+  const closedLipBottom = m.y + smile * scaleY * 0.35;
+  if (open < 0.06) {
+    const lipH = Math.max(scaleY * 0.18, 4);
+    const upperLipH = lipH * 0.9;
+    ctx.save();
     ctx.beginPath();
     upperPath();
-    ctx.bezierCurveTo(right - w * 0.35, midLower, left + w * 0.35, midLower, left, cornerY);
+    ctx.bezierCurveTo(right - w * 0.3, closedLipTop + upperLipH * 0.3, left + w * 0.3, closedLipTop + upperLipH * 0.3, left, cornerY);
+    ctx.closePath();
+    ctx.fillStyle = shade(color, -0.12);
+    ctx.fill();
+    ctx.beginPath();
+    upperPath();
+    ctx.bezierCurveTo(right - w * 0.3, closedLipTop - upperLipH * 0.6, left + w * 0.3, closedLipTop - upperLipH * 0.6, left, cornerY);
+    ctx.closePath();
+    ctx.fillStyle = shade(color, 0.08);
+    ctx.fill();
+    ctx.beginPath();
+    upperPath();
+    ctx.bezierCurveTo(right - w * 0.3, closedLipTop + lipH, left + w * 0.3, closedLipTop + lipH, left, cornerY);
+    ctx.closePath();
+    ctx.fillStyle = shade(color, 0);
+    ctx.fill();
+    ctx.strokeStyle = shade(color, -0.25);
+    ctx.lineWidth = thinStroke;
+    ctx.beginPath();
+    upperPath();
+    ctx.bezierCurveTo(right - w * 0.3, closedLipTop + lipH, left + w * 0.3, closedLipTop + lipH, left, cornerY);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.22)';
+    ctx.beginPath();
+    ctx.ellipse(m.x, closedLipBottom, w * 0.35, lipH * 0.45, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  } else {
+    ctx.beginPath();
+    upperPath();
+    lowerPath();
     ctx.closePath();
     ctx.fillStyle = 'rgb(58, 16, 30)';
     ctx.fill();
     ctx.save();
     ctx.clip();
-    // Top teeth: a soft white band under the upper lip, shown when smiling.
     if (smile > 0.3) {
       ctx.fillStyle = `rgba(255, 252, 245, ${Math.min(1, (smile - 0.3) * 2)})`;
       ctx.beginPath();
@@ -208,29 +253,52 @@ function drawMouth(ctx: CanvasRenderingContext2D, l: EyeLayout, pose: EyePose, c
       ctx.closePath();
       ctx.fill();
     }
-    // Tongue.
     ctx.fillStyle = 'rgb(226, 98, 118)';
     ctx.beginPath();
     ctx.ellipse(m.x, midLower - scaleY * 0.05, w * 0.42, scaleY * 0.35 * open + 2, 0, Math.PI, 0, true);
     ctx.fill();
     ctx.restore();
+    const upperLipBand = (): void => {
+      ctx.beginPath();
+      upperPath();
+      ctx.bezierCurveTo(right - w * 0.3, closedLipTop - scaleY * 0.08, left + w * 0.3, closedLipTop - scaleY * 0.08, left, cornerY);
+      ctx.closePath();
+    };
+    const lowerLipBand = (): void => {
+      ctx.beginPath();
+      ctx.moveTo(left, cornerY);
+      lowerPath();
+      ctx.bezierCurveTo(right - w * 0.3, midLower + scaleY * 0.12, left + w * 0.3, midLower + scaleY * 0.12, left, cornerY);
+      ctx.closePath();
+    };
+    upperLipBand();
+    ctx.fillStyle = shade(color, 0.06);
+    ctx.fill();
+    lowerLipBand();
+    ctx.fillStyle = shade(color, 0);
+    ctx.fill();
+    upperLipBand();
+    ctx.strokeStyle = shade(color, -0.2);
+    ctx.lineWidth = thinStroke;
+    ctx.stroke();
+    lowerLipBand();
+    ctx.strokeStyle = shade(color, -0.22);
+    ctx.lineWidth = thinStroke;
+    ctx.stroke();
+    // lower-lip highlight
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.22)';
+    ctx.beginPath();
+    ctx.ellipse(m.x, midLower - scaleY * 0.06, w * 0.32, scaleY * 0.1, 0, 0, Math.PI * 2);
+    ctx.fill();
   }
-  // Lips.
-  ctx.strokeStyle = shade(color, 0);
-  ctx.lineWidth = thickness;
-  ctx.beginPath();
-  upperPath();
-  if (open > 0.06) ctx.bezierCurveTo(right - w * 0.35, midLower, left + w * 0.35, midLower, left, cornerY);
-  ctx.stroke();
-  // Small dimples at the corners make a smile read clearly, even when small.
   if (smile > 0.35) {
-    ctx.lineWidth = thickness * 0.7;
+    ctx.lineWidth = thinStroke * 0.7;
     ctx.globalAlpha = pose.mouthOpacity * Math.min(1, (smile - 0.35) * 2);
     for (const side of [-1, 1]) {
       const cx = side < 0 ? left : right;
       ctx.beginPath();
-      ctx.moveTo(cx - side * thickness * 0.2, cornerY - thickness * 0.2);
-      ctx.quadraticCurveTo(cx + side * thickness * 1.2, cornerY - thickness * 0.4, cx + side * thickness * 0.9, cornerY + thickness * 1.3);
+      ctx.moveTo(cx - side * thinStroke * 0.2, cornerY - thinStroke * 0.2);
+      ctx.quadraticCurveTo(cx + side * thinStroke * 1.2, cornerY - thinStroke * 0.4, cx + side * thinStroke * 0.9, cornerY + thinStroke * 1.3);
       ctx.stroke();
     }
   }
