@@ -599,6 +599,25 @@ function drawSleep(ctx: CanvasRenderingContext2D, l: EyeLayout, pose: EyePose, t
   ctx.restore();
 }
 
+function wrapLines(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+  const words = text.split(' ');
+  if (words.length <= 1) return [text];
+  if (ctx.measureText(text).width <= maxWidth) return [text];
+  const lines: string[] = [];
+  let current = words[0]!;
+  for (let i = 1; i < words.length; i++) {
+    const candidate = current + ' ' + words[i]!;
+    if (ctx.measureText(candidate).width <= maxWidth) {
+      current = candidate;
+    } else {
+      lines.push(current);
+      current = words[i]!;
+    }
+  }
+  lines.push(current);
+  return lines;
+}
+
 function drawInspiration(ctx: CanvasRenderingContext2D, width: number, height: number, pose: EyePose, time: number, _layout: EyeLayout): void {
   const insp = pose.inspiration;
   if (!insp) return;
@@ -619,18 +638,26 @@ function drawInspiration(ctx: CanvasRenderingContext2D, width: number, height: n
   const driftX = Math.sin(elapsed * 0.5) * width * 0.015;
   const y = baseY + driftY + lift;
   const x = width / 2 + driftX;
+  const maxWidth = width * 0.88;
   ctx.save();
   ctx.font = `800 ${size}px ui-rounded, "SF Pro Rounded", "Nunito", "Segoe UI", system-ui, sans-serif`;
+  ctx.letterSpacing = `${size * 0.02}px`;
+  const lines = wrapLines(ctx, insp.text, maxWidth);
+  const lineHeight = size * 1.18;
+  const totalH = lines.length * lineHeight;
+  const startY = y - (totalH - lineHeight) / 2;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.letterSpacing = `${size * 0.02}px`;
   ctx.shadowColor = `rgba(0, 0, 0, ${0.65 * alpha})`;
   ctx.shadowBlur = size * 0.5;
-  ctx.lineWidth = Math.max(2, size * 0.06);
-  ctx.strokeStyle = `rgba(0, 0, 0, ${0.35 * alpha})`;
+  ctx.lineWidth = Math.max(2, size * 0.065);
+  ctx.strokeStyle = `rgba(0, 0, 0, ${0.38 * alpha})`;
   ctx.fillStyle = colorWithAlpha;
-  ctx.strokeText(insp.text, x, y);
-  ctx.fillText(insp.text, x, y);
+  for (let i = 0; i < lines.length; i++) {
+    const ly = startY + i * lineHeight;
+    ctx.strokeText(lines[i]!, x, ly);
+    ctx.fillText(lines[i]!, x, ly);
+  }
   ctx.restore();
 }
 
