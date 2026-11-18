@@ -108,6 +108,13 @@ describe('EyeAnimator', () => {
     expect(a.pose.captionOpacity).toBeGreaterThan(0.7);
   });
 
+  it('mouthAlive varies with time', () => {
+    const a = new EyeAnimator(defaultSettings(), 11, 0);
+    const p1 = a.update(0);
+    const p2 = a.update(0.5);
+    expect(p1.mouthAlive).not.toBe(p2.mouthAlive);
+  });
+
   it('static poses exist for every mood', () => {
     for (const mood of MOODS) expect(staticPose(mood).mood).toBe(mood);
   });

@@ -156,7 +156,7 @@ function drawMouth(ctx: CanvasRenderingContext2D, l: EyeLayout, pose: EyePose, c
   const smile = pose.mouthSmile;
   const open = pose.mouthOpen;
   const scaleY = l.ry * 0.5;
-  const alive = (pose as unknown as { mouthAlive?: number }).mouthAlive ?? 0;
+  const alive = pose.mouthAlive;
   const aliveY = alive * scaleY * 0.5;
   const cornerY = m.y - smile * scaleY * 0.45 + aliveY;
   const midUpper = m.y + smile * scaleY * 0.15 - open * scaleY * 0.1 + aliveY * 0.5;

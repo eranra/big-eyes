@@ -52,6 +52,8 @@ export interface EyePose {
   mood: Mood;
   /** Happy message shown while sleeping/bored, or null. */
   inspiration: ActiveInspiration | null;
+  /** Tiny alive wobble for the mouth, -1..1. */
+  mouthAlive: number;
 }
 
 /** Target look of each mood. The animator moves toward these values with springs. */
@@ -291,13 +293,15 @@ export class EyeAnimator {
     this.sleepBubble.target = mood === 'sleeping' ? 1 : 0;
     this.sleepBubble.step(dt);
 
+    const mouthAlive =
+      Math.sin(now * 1.1 + this.phase) * 0.015 + Math.sin(now * 0.53 + this.phase * 1.3) * 0.008;
     const breathing =
       Math.sin(t * (mood === 'sleeping' ? 1.1 : 1.6) + this.phase) * (mood === 'sleeping' ? 0.018 : 0.008);
-    this.pose = this.buildPose(blink, breathing, inspiration);
+    this.pose = this.buildPose(blink, breathing, inspiration, mouthAlive);
     return this.pose;
   }
 
-  private buildPose(blink: number, breathing = 0, inspiration: ActiveInspiration | null = null): EyePose {
+  private buildPose(blink: number, breathing = 0, inspiration: ActiveInspiration | null = null, mouthAlive = 0): EyePose {
     const lid = clamp(this.upperLid.value, 0, 1);
     return {
       gaze: this.gaze.value,
@@ -322,6 +326,7 @@ export class EyeAnimator {
       mouthOpacity: clamp(this.mouthAlpha.value, 0, 1),
       mood: this.moods.mood,
       inspiration,
+      mouthAlive,
     };
   }
 
@@ -460,5 +465,6 @@ export function staticPose(mood: Mood, settings: Settings = defaultSettings()): 
     mouthOpacity: settings.look.showMouth ? 1 : 0,
     mood,
     inspiration: null,
+    mouthAlive: 0,
   };
 }
