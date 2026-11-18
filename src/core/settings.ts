@@ -193,6 +193,8 @@ export interface Settings {
   inspirationsInterval: number;
   /** How long each happy message stays visible, seconds. */
   inspirationsDuration: number;
+  /** Cartoon hands at the bottom edge. */
+  showHands: boolean;
   attention: AttentionSettings;
   mood: MoodSettings;
 }
@@ -545,6 +547,7 @@ export function defaultSettings(): Settings {
     showInspirations: true,
     inspirationsInterval: 10,
     inspirationsDuration: 8,
+    showHands: false,
     mirrorCamera: false,
     respectVideoPlayback: true,
     openAtLogin: false,
@@ -748,6 +751,7 @@ export function normalizeSettings(input: unknown): Settings {
     showInspirations: bool(s.showInspirations, d.showInspirations),
     inspirationsInterval: num(s.inspirationsInterval, d.inspirationsInterval, 3, 120),
     inspirationsDuration: num(s.inspirationsDuration, d.inspirationsDuration, 1, 30),
+    showHands: bool(s.showHands, d.showHands),
     mirrorCamera: bool(s.mirrorCamera, d.mirrorCamera),
     respectVideoPlayback: bool(s.respectVideoPlayback, d.respectVideoPlayback),
     openAtLogin: bool(s.openAtLogin, d.openAtLogin),

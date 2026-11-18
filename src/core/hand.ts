@@ -31,7 +31,7 @@ export function defaultHandSettings(): HandSettings {
 
 export class HandScheduler {
   pose: HandPose = { gesture: 'rest', lift: 0, spread: 0, rotation: 0, opacity: 0, yJitter: 0 };
-  private settings: HandSettings;
+  settings: HandSettings;
 
   constructor(settings: HandSettings, _seed = 1) {
     this.settings = settings;
