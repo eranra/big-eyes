@@ -134,6 +134,7 @@ export function drawEyes(ctx: CanvasRenderingContext2D, width: number, height: n
     if (look.showBrows) drawBrow(ctx, cx, l.cy, l.rx, l.ry, side, pose, look.browColor);
   }
   if (pose.mouthOpacity > 0.01) drawMouth(ctx, l, pose, look.mouthColor);
+  if (pose.hands.opacity > 0.01) drawHands(ctx, l, pose, look.mouthColor);
   drawCaption(ctx, l, pose, look.glowColor);
   if (pose.inspiration && pose.inspiration.opacity > 0.01) drawInspiration(ctx, width, height, pose, o.time, l);
   if (pose.sleepOpacity > 0.01) drawSleep(ctx, l, pose, o.time);
@@ -663,6 +664,70 @@ function drawSleep(ctx: CanvasRenderingContext2D, l: EyeLayout, pose: EyePose, t
     ctx.font = `700 ${size}px ui-rounded, "SF Pro Rounded", system-ui, sans-serif`;
     ctx.fillStyle = `rgba(255, 255, 255, ${0.75 * alpha})`;
     ctx.fillText('z', sx + t * l.rx * 0.9 + Math.sin(t * 6) * l.rx * 0.08, sy - t * l.ry * 1.2);
+  }
+  ctx.restore();
+}
+
+export function handPlace(l: EyeLayout): { x: number; y: number; halfWidth: number } {
+  const mx = mouthPlace(l);
+  return { x: mx.x, y: mx.y + l.ry * 0.55, halfWidth: l.spacing * 0.55 };
+}
+
+export function drawHands(ctx: CanvasRenderingContext2D, l: EyeLayout, pose: EyePose, color: string): void {
+  const hp = pose.hands;
+  if (!hp || hp.opacity < 0.01) return;
+  const p = handPlace(l);
+  const skin = shade(color, 0.55);
+  const skinDark = shade(color, 0.25);
+  ctx.save();
+  ctx.globalAlpha = hp.opacity;
+  const palmW = l.rx * 0.7;
+  const palmH = l.rx * 0.55;
+  const spacing = l.spacing * 0.55;
+  const yJ = hp.yJitter;
+  const fingerW = palmW * 0.11;
+  const fingerGap = fingerW * 0.35;
+  function drawHand(cx: number, cy: number, mirrored: number): void {
+    ctx.save();
+    ctx.translate(cx, cy + yJ);
+    ctx.rotate((hp.rotation * Math.PI) / 180 * mirrored);
+    ctx.translate(0, -hp.lift * l.ry * 0.6);
+    ctx.fillStyle = skin;
+    ctx.strokeStyle = skinDark;
+    ctx.lineWidth = Math.max(1, l.rx * 0.02);
+    ctx.beginPath();
+    ctx.ellipse(0, 0, palmW * 0.5, palmH * 0.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    const spreadFactor = 1 + hp.spread * 1.2;
+    const totalW = 4 * fingerW + 3 * fingerGap * spreadFactor;
+    let fx = -totalW / 2 + fingerW / 2;
+    for (let i = 0; i < 4; i++) {
+      const fh = palmH * (0.55 + (i === 1 ? 0.12 : i === 2 ? 0.1 : 0));
+      ctx.fillStyle = skin;
+      ctx.beginPath();
+      ctx.roundRect(fx - fingerW / 2, -palmH * 0.5 - fh, fingerW, fh, fingerW / 2);
+      ctx.fill();
+      ctx.stroke();
+      fx += fingerW + fingerGap * spreadFactor;
+    }
+    ctx.beginPath();
+    ctx.ellipse(mirrored * palmW * 0.35, palmH * 0.1, fingerW * 0.9, fingerW * 0.7, mirrored * 0.6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
+  drawHand(p.x - spacing, p.y, -1);
+  drawHand(p.x + spacing, p.y, 1);
+  // pointing finger hint when gesture is point
+  if (hp.gesture === 'point') {
+    ctx.fillStyle = skin;
+    ctx.strokeStyle = skinDark;
+    ctx.lineWidth = Math.max(1, l.rx * 0.02);
+    ctx.beginPath();
+    ctx.roundRect(p.x - fingerW / 2, p.y - palmH * 0.5 - palmH * 0.7 + yJ - hp.lift * l.ry * 0.6, fingerW, palmH * 0.7, fingerW / 2);
+    ctx.fill();
+    ctx.stroke();
   }
   ctx.restore();
 }
