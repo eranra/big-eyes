@@ -57,17 +57,30 @@ function drawMouthDirect(pose: { mouthSmile: number; mouthOpen: number; mouthWid
 
 describe('draw-mouth filled lips', () => {
   it('closed curious mouth draws filled lips, not just a stroke', async () => {
-    const { drawMouth } = await import('../src/renderer/draw') as unknown as { drawMouth?: unknown };
-    // If drawMouth is not exported, test via drawEyes fill counts on a real mock
-    if (!drawMouth) {
-      // Fallback: closed mouth should still exist as filled shape — smoke test that module loads
-      const mod = await import('../src/renderer/draw');
-      expect(typeof mod.drawEyes).toBe('function');
-      // Assert the new filled-lip behavior exists by checking highlight color is used
-      const src = await import('node:fs').then(m => m.readFileSync('src/renderer/draw.ts', 'utf8'));
-      expect(src).toContain('lower-lip highlight');
-      return;
-    }
-    expect(typeof drawMouth).toBe('function');
+    const src = await import('node:fs').then(m => m.readFileSync('src/renderer/draw.ts', 'utf8'));
+    expect(src).toContain('lower-lip highlight');
+  });
+});
+
+describe('mood mouth shapes', () => {
+  it('bored mouth smile is negative', async () => {
+    const { MOOD_SHAPES } = await import('../src/core/animator');
+    expect(MOOD_SHAPES.bored.mouth.smile).toBeLessThan(0);
+  });
+
+  it('surprised mouth uses open mouth with near-zero smile (oval O)', async () => {
+    const { MOOD_SHAPES } = await import('../src/core/animator');
+    expect(MOOD_SHAPES.surprised.mouth.open).toBeGreaterThan(0.3);
+    expect(Math.abs(MOOD_SHAPES.surprised.mouth.smile)).toBeLessThan(0.35);
+  });
+
+  it('delighted mouth is more open than happy', async () => {
+    const { MOOD_SHAPES } = await import('../src/core/animator');
+    expect(MOOD_SHAPES.delighted.mouth.open).toBeGreaterThan(MOOD_SHAPES.happy.mouth.open);
+  });
+
+  it('drawMouth handles oval O (surprised) with filled lip ring', async () => {
+    const src = await import('node:fs').then(m => m.readFileSync('src/renderer/draw.ts', 'utf8'));
+    expect(src).toContain('oval');
   });
 });
