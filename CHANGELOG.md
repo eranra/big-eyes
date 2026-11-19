@@ -3,6 +3,15 @@
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.6.5] - 2026-11-19
+
+### Fixed
+
+- **Pink at the sides of the smiling mouth — the real culprit:** the cheek blush. Its pink ellipses hung
+  under the outer eye halves but reached down to the mouth corners, reading as a tongue coming out the
+  sides. The blush now sits right under each eye — clearly cheeks — smaller and softer, and nothing pink
+  reaches the mouth any more. (The tongue itself was already centered; it never was the cause.)
+
 ## [0.6.4] - 2026-11-19
 
 ### Fixed

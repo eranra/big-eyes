@@ -440,16 +440,17 @@ function drawEye(
   ctx.fill();
   ctx.restore();
 
-  // Cheeks: a soft blush under the outer half of the eye when smiling.
+  // Cheeks: a soft rosy blush right under each eye when smiling. Kept high on the
+  // face (well above the mouth) so it reads as cheeks, never as something by the mouth.
   if (look.showBlush && pose.smile > 0.05) {
     const bx = px(0.35 * side);
-    const by = py(-1.05);
-    const blush = ctx.createRadialGradient(bx, by, 0, bx, by, rx * 0.55);
-    blush.addColorStop(0, `rgba(255, 120, 150, ${0.42 * pose.smile})`);
+    const by = py(-0.78);
+    const blush = ctx.createRadialGradient(bx, by, 0, bx, by, rx * 0.42);
+    blush.addColorStop(0, `rgba(255, 120, 150, ${0.34 * pose.smile})`);
     blush.addColorStop(1, 'rgba(255, 120, 150, 0)');
     ctx.fillStyle = blush;
     ctx.beginPath();
-    ctx.ellipse(bx, by, rx * 0.55, ry * 0.32, 0, 0, Math.PI * 2);
+    ctx.ellipse(bx, by, rx * 0.42, ry * 0.2, 0, 0, Math.PI * 2);
     ctx.fill();
   }
 
