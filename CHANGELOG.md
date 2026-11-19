@@ -3,6 +3,14 @@
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.6.2] - 2026-11-19
+
+### Changed
+
+- **Hands, engaging pose:** the hands sit further to the sides and open outward at 45 degrees — a welcoming
+  "ta-da" instead of facing straight up. Clap and cover bring them back upright to meet in front,
+  and drooping sinks them visibly down.
+
 ## [0.6.1] - 2026-11-19
 
 ### Changed

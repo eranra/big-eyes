@@ -62,7 +62,7 @@ export class HandScheduler {
       spread = 0.08;
     } else if (gesture === 'droop') {
       lift = -0.15;
-      rotation = -12;
+      rotation = -35;
     } else {
       lift = 0.08;
       spread = 0.08;

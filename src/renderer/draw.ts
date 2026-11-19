@@ -670,7 +670,7 @@ function drawSleep(ctx: CanvasRenderingContext2D, l: EyeLayout, pose: EyePose, t
 
 /** Where the hands sit: to the sides of the eyes, about the eyes' height. */
 export function handPlace(l: EyeLayout): { y: number; halfWidth: number } {
-  return { y: l.cy + l.ry * 0.1, halfWidth: l.spacing * 1.7 + l.rx * 1.25 };
+  return { y: l.cy + l.ry * 0.1, halfWidth: l.spacing * 2.05 + l.rx * 1.45 };
 }
 
 /**
@@ -698,10 +698,13 @@ export function drawHands(ctx: CanvasRenderingContext2D, width: number, l: EyeLa
     const x = clampNumber(l.cx + side * (p.halfWidth - pull), margin, Math.max(margin, width - margin));
     const y = p.y + hp.yJitter;
     const pointing = hp.gesture === 'point' && side === 1;
+    // The resting tilt: hands open outward at 45 degrees, like a welcoming "ta-da".
+    // Clap and cover bring them back upright so the palms can meet.
+    const baseTilt = hp.gesture === 'clap' ? 18 : hp.gesture === 'cover' ? 8 : 45;
     ctx.save();
     ctx.globalAlpha = hp.opacity;
     ctx.translate(x, y);
-    ctx.rotate((side * hp.rotation * Math.PI) / 180);
+    ctx.rotate((side * (baseTilt + hp.rotation) * Math.PI) / 180);
     ctx.translate(0, -hp.lift * palmR);
     // Arm stump toward the bottom.
     ctx.fillStyle = skinDark;
