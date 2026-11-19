@@ -3,6 +3,14 @@
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.6.4] - 2026-11-19
+
+### Fixed
+
+- **"Tongue" at the sides of the happy smile:** those were the corner dimple strokes — small pink curves
+  outside both lip corners that read as a tongue poking out. Removed; the filled cartoon lips carry the
+  smile on their own.
+
 ## [0.6.3] - 2026-11-19
 
 ### Fixed

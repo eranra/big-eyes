@@ -299,17 +299,6 @@ function drawMouth(ctx: CanvasRenderingContext2D, l: EyeLayout, pose: EyePose, c
     ctx.ellipse(m.x, midLower - scaleY * 0.06, w * 0.32, scaleY * 0.1, 0, 0, Math.PI * 2);
     ctx.fill();
   }
-  if (smile > 0.35) {
-    ctx.lineWidth = thinStroke * 0.7;
-    ctx.globalAlpha = pose.mouthOpacity * Math.min(1, (smile - 0.35) * 2);
-    for (const side of [-1, 1]) {
-      const cx = side < 0 ? left : right;
-      ctx.beginPath();
-      ctx.moveTo(cx - side * thinStroke * 0.2, cornerY - thinStroke * 0.2);
-      ctx.quadraticCurveTo(cx + side * thinStroke * 1.2, cornerY - thinStroke * 0.4, cx + side * thinStroke * 0.9, cornerY + thinStroke * 1.3);
-      ctx.stroke();
-    }
-  }
   ctx.restore();
 }
 
