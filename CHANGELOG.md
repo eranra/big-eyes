@@ -3,6 +3,13 @@
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.6.3] - 2026-11-19
+
+### Fixed
+
+- **Tongue in the open (delighted) mouth:** a small soft dome now peeks from behind the lower lip at the
+  center — before, it was nearly as wide as the mouth and read as poking out of the sides.
+
 ## [0.6.2] - 2026-11-19
 
 ### Changed

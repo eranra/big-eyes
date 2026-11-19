@@ -254,9 +254,16 @@ function drawMouth(ctx: CanvasRenderingContext2D, l: EyeLayout, pose: EyePose, c
       ctx.closePath();
       ctx.fill();
     }
+    // Tongue: a small soft dome peeking from behind the lower lip, centered — never from the side.
+    const tongueR = w * 0.24;
+    const tongueH = Math.max(3, scaleY * 0.26 * Math.min(open, 1));
     ctx.fillStyle = 'rgb(226, 98, 118)';
     ctx.beginPath();
-    ctx.ellipse(m.x, midLower - scaleY * 0.05, w * 0.42, scaleY * 0.35 * open + 2, 0, Math.PI, 0, true);
+    ctx.ellipse(m.x, midLower - tongueH * 0.2, tongueR, tongueH, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
+    ctx.beginPath();
+    ctx.ellipse(m.x, midLower - tongueH * 0.35, tongueR * 0.55, tongueH * 0.4, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
     const upperLipBand = (): void => {
