@@ -3,6 +3,17 @@
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.6.6] - 2026-11-19
+
+### Fixed
+
+- **The real "tongue from the side" in the smiling-back mouth:** the lower-lip fill path started its
+  right-to-left sweep from the left corner, collapsing into an asymmetric pink blob at the lower-left of
+  the mouth. The path now starts at the right corner, so the lower lip fills symmetrically. The tongue
+  itself now peeks from behind the lower lip at the exact center — a small soft dome. A regression test
+  renders the delighted mouth through a recording canvas and asserts the tongue is centered and the lip
+  fill starts at the right corner.
+
 ## [0.6.5] - 2026-11-19
 
 ### Fixed

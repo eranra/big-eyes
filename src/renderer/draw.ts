@@ -254,16 +254,18 @@ function drawMouth(ctx: CanvasRenderingContext2D, l: EyeLayout, pose: EyePose, c
       ctx.closePath();
       ctx.fill();
     }
-    // Tongue: a small soft dome peeking from behind the lower lip, centered — never from the side.
+    // Tongue: a small soft dome peeking from behind the lower lip at the exact center.
+    // The lower lip curve's real depth at its middle (a Bézier reaches 3/4 of its control points).
+    const lowerMidY = cornerY * 0.25 + midLower * 0.75;
     const tongueR = w * 0.24;
-    const tongueH = Math.max(3, scaleY * 0.26 * Math.min(open, 1));
+    const tongueH = Math.max(3, scaleY * 0.34 * Math.min(open, 1));
     ctx.fillStyle = 'rgb(226, 98, 118)';
     ctx.beginPath();
-    ctx.ellipse(m.x, midLower - tongueH * 0.2, tongueR, tongueH, 0, 0, Math.PI * 2);
+    ctx.ellipse(m.x, lowerMidY + tongueH * 0.35, tongueR, tongueH, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
     ctx.beginPath();
-    ctx.ellipse(m.x, midLower - tongueH * 0.35, tongueR * 0.55, tongueH * 0.4, 0, 0, Math.PI * 2);
+    ctx.ellipse(m.x, lowerMidY - tongueH * 0.15, tongueR * 0.55, tongueH * 0.35, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
     const upperLipBand = (): void => {
@@ -272,11 +274,14 @@ function drawMouth(ctx: CanvasRenderingContext2D, l: EyeLayout, pose: EyePose, c
       ctx.bezierCurveTo(right - w * 0.3, closedLipTop - scaleY * 0.08, left + w * 0.3, closedLipTop - scaleY * 0.08, left, cornerY);
       ctx.closePath();
     };
+    // The lower lip runs from the right corner to the left (lowerPath), then back along a
+    // deeper curve to the right. Both curves must traverse right <-> left, or the fill
+    // collapses into an asymmetric blob on one side.
     const lowerLipBand = (): void => {
       ctx.beginPath();
-      ctx.moveTo(left, cornerY);
+      ctx.moveTo(right, cornerY);
       lowerPath();
-      ctx.bezierCurveTo(right - w * 0.3, midLower + scaleY * 0.12, left + w * 0.3, midLower + scaleY * 0.12, left, cornerY);
+      ctx.bezierCurveTo(left + w * 0.3, midLower + scaleY * 0.12, right - w * 0.3, midLower + scaleY * 0.12, right, cornerY);
       ctx.closePath();
     };
     upperLipBand();

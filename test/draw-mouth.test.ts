@@ -62,6 +62,64 @@ describe('draw-mouth filled lips', () => {
   });
 });
 
+describe('delighted mouth regression: tongue centered, lips symmetric', () => {
+  it('tongue ellipses sit at the mouth center and the lower lip fill is symmetric', async () => {
+    const { drawEyes, eyeLayout, shade } = await import('../src/renderer/draw');
+    const { staticPose } = await import('../src/core/animator');
+    const { defaultSettings } = await import('../src/core/settings');
+
+    const ellipses: Array<{ style: string; x: number }> = [];
+    const fills: Array<{ style: string; xs: number[]; firstX: number }> = [];
+    let path: number[] = [];
+    let firstX = 0;
+    let style = '';
+    const ctx = {
+      canvas: {},
+      get fillStyle() { return style; },
+      set fillStyle(v) { style = v; },
+      strokeStyle: '', lineWidth: 1, globalAlpha: 1, lineCap: '', lineJoin: '',
+      shadowColor: '', shadowBlur: 0, shadowOffsetY: 0, font: '', textAlign: '', textBaseline: '', letterSpacing: '',
+      save() {}, restore() {}, closePath() {}, arc() {}, rect() {}, fillText() {}, strokeText() {},
+      clip() {}, stroke() {}, translate() {}, rotate() {}, scale() {}, setTransform() {},
+      clearRect() {}, fillRect() {}, measureText: () => ({ width: 10 }),
+      createRadialGradient: () => ({ addColorStop() {} }),
+      createLinearGradient: () => ({ addColorStop() {} }),
+      beginPath() { path = []; },
+      moveTo(x: number, y: number) { if (path.length === 0) firstX = x; path.push(x, y); },
+      lineTo(x: number, y: number) { path.push(x, y); },
+      bezierCurveTo(...p: number[]) { path.push(...p); },
+      quadraticCurveTo(...p: number[]) { path.push(...p); },
+      roundRect(...p: number[]) { path.push(...p); },
+      ellipse(x: number, y: number) { ellipses.push({ style, x }); path.push(x, y); },
+      fill() { fills.push({ style, xs: path.filter((_, i) => i % 2 === 0), firstX }); },
+    } as unknown as CanvasRenderingContext2D;
+
+    const settings = defaultSettings();
+    const pose = staticPose('delighted', settings);
+    const width = 900;
+    const height = 700;
+    drawEyes(ctx, width, height, pose, { irisColor: settings.irisColor, look: settings.look, eyeSize: 1, time: 1.3 });
+    const l = eyeLayout(width, height, pose, 1, settings.look, 'center');
+
+    // The tongue must be at the mouth center, never to the side.
+    const tongue = ellipses.filter((e) => e.style === 'rgb(226, 98, 118)');
+    expect(tongue.length).toBeGreaterThan(0);
+    for (const t of tongue) expect(Math.abs(t.x - l.cx)).toBeLessThan(0.5);
+
+    // The lower lip fill must start at the right corner (where lowerPath begins its
+    // right-to-left sweep) and span symmetrically — starting from the left collapses
+    // the fill into an asymmetric blob on one side of the mouth.
+    const lipStyle = shade(settings.look.mouthColor, 0);
+    const lipFills = fills.filter((f) => f.style === lipStyle && f.xs.length >= 4);
+    expect(lipFills.length).toBeGreaterThan(0);
+    for (const f of lipFills) {
+      expect(f.firstX).toBeGreaterThan(l.cx);
+      const mid = (Math.min(...f.xs) + Math.max(...f.xs)) / 2;
+      expect(Math.abs(mid - l.cx)).toBeLessThan(1);
+    }
+  });
+});
+
 describe('mood mouth shapes', () => {
   it('bored mouth smile is negative', async () => {
     const { MOOD_SHAPES } = await import('../src/core/animator');
