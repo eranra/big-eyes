@@ -97,6 +97,8 @@ springy movement, expressive eyebrows, and wet-looking highlights.
 - By default, moving the mouse **onto the eyes** closes them; moving it elsewhere is fine.
   You can change this to *any mouse movement* or *never* (then only a key or click closes them).
 - Optional: **look into the eyes to close them.** Hold eye contact for a moment, a ring fills up, and they wink goodbye. 😉
+  While this is on, moving the mouse onto the eyes no longer closes them — the look is the goodbye (a key press or
+  click still does).
 - **They wait while you're looking at the screen** — reading something without touching the keyboard doesn't wake them.
   A short camera check before they appear uses the same eye-contact detection as the rest of the app, so looking at
   your phone doesn't count. (You can turn this off in **Show After**.)
@@ -125,7 +127,7 @@ Click the 👀 icon for quick choices, or open **Settings…** for everything, w
 | **Eye size** | Very Small, Small, Medium, Large, Huge, or any size | Medium |
 | **Position** | Center, top left, top right, bottom left, bottom right | Center |
 | **Blinking** | How often (never … very often) and how fast (slow and sleepy … quick) | Normal |
-| **Closing** | Mouse onto the eyes, any mouse movement, or never; and *look into the eyes to close them* (1–10 s) | Mouse onto the eyes; look-to-close off |
+| **Closing** | Mouse onto the eyes, any mouse movement, or never; and *look into the eyes to close them* (1–10 s). While look-to-close is on, the mouse-on-the-eyes rule is off | Mouse onto the eyes; look-to-close off |
 | **Show after** | 15 seconds … 10 minutes, or any time | 30 seconds |
 | **Wait while I'm looking** | Don't appear while someone is looking at the screen, even without keyboard or mouse use | On |
 | **Screen saver** | Pause the eyes during the screen saver, or let the eyes replace the screen saver | Pause |

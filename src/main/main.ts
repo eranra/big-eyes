@@ -19,7 +19,7 @@ import {
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { IdleMonitor, pointInRects } from '../core/idle';
+import { effectiveMouseRule, IdleMonitor, pointInRects } from '../core/idle';
 import { PresenceCheck } from '../core/presence';
 import { ActivityClock } from '../core/activity';
 import { AfterEyesTimer } from '../core/after-eyes';
@@ -646,7 +646,15 @@ async function checkIdle(): Promise<void> {
     lastIdleSeconds = idleSeconds;
     updateBlur(idleSeconds);
     if (STAY && idle.isShowing) return;
-    const event = idle.update({ idleSeconds, now, blocked, pointerMoved, pointerInEyes, mouseRule: s.mouseRule });
+    const event = idle.update({
+      idleSeconds,
+      now,
+      blocked,
+      pointerMoved,
+      pointerInEyes,
+      // With look-to-close on, the look is the goodbye: the pointer on the eyes no longer closes them.
+      mouseRule: effectiveMouseRule(s.mouseRule, s.lookToClose),
+    });
     if (event) {
       const k = inputKinds?.latest();
       const kinds = k ? ` key=${k.key.toFixed(1)} click=${k.click.toFixed(1)} scroll=${k.scroll.toFixed(1)} move=${k.move.toFixed(1)}` : '';

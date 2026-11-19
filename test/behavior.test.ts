@@ -185,6 +185,56 @@ describe('look to close', () => {
     simulate(a, [lookingFace()], 0, 5);
     expect(a.wantsToClose).toBe(false);
   });
+
+  it('a 5-second look time waits for the full 5 seconds of eye contact', () => {
+    const s = mergeSettings(defaultSettings(), { lookToClose: true, lookToCloseSeconds: 5 });
+    const a = new EyeAnimator(s, 1);
+    let closedAt: number | null = null;
+    let t = 0;
+    while (t < 8 && closedAt === null) {
+      if (Math.round(t * 60) % 3 === 0) a.ingest([lookingFace()], t);
+      a.update(t);
+      if (a.wantsToClose) closedAt = t;
+      t += 1 / 60;
+    }
+    expect(closedAt).not.toBeNull();
+    // Never before the full 5 seconds of contact, and not much later.
+    expect(closedAt!).toBeGreaterThanOrEqual(5);
+    expect(closedAt!).toBeLessThanOrEqual(6.5);
+    // The ring is still filling partway through the gaze.
+    const half = new EyeAnimator(s, 2);
+    simulate(half, [lookingFace()], 0, 2.5);
+    expect(half.pose.closeProgress).toBeGreaterThan(0.2);
+    expect(half.pose.closeProgress).toBeLessThan(0.85);
+    expect(half.wantsToClose).toBe(false);
+  });
+});
+
+describe('look-to-close and the mouse rule', () => {
+  it('with look-to-close on, moving the mouse onto the eyes no longer closes them', async () => {
+    const { effectiveMouseRule } = await import('../src/core/idle');
+    // The look is the goodbye: the pointer-on-the-eyes rule yields.
+    expect(effectiveMouseRule('onto-eyes', true)).toBe('never');
+    expect(effectiveMouseRule('onto-eyes', false)).toBe('onto-eyes');
+    // An explicit stronger mouse choice still applies.
+    expect(effectiveMouseRule('any', true)).toBe('any');
+    expect(effectiveMouseRule('never', true)).toBe('never');
+
+    const m = new IdleMonitor(30);
+    m.forceShow(0, 30);
+    const rule = effectiveMouseRule('onto-eyes', true);
+    expect(
+      m.update({ idleSeconds: 0, now: 0.2, pointerMoved: true, pointerInEyes: true, mouseRule: rule }),
+    ).toBeNull();
+    expect(m.isShowing).toBe(true);
+    // Without look-to-close, the pointer on the eyes still closes them.
+    const plain = new IdleMonitor(30);
+    plain.forceShow(0, 30);
+    expect(
+      plain.update({ idleSeconds: 0, now: 0.2, pointerMoved: true, pointerInEyes: true, mouseRule: 'onto-eyes' }),
+    ).toBe('hide');
+    expect(plain.lastHideReason).toBe('pointer-in-eyes');
+  });
 });
 
 describe('new settings validation', () => {

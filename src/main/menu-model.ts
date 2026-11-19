@@ -260,6 +260,12 @@ export function closingMenu(settings: Settings): MenuNode {
   }));
   items.push({ ...after, label: 'Look Time', enabled: settings.lookToClose });
   items.push({ label: 'A key press or click always closes them', enabled: false });
+  items.push({
+    label: settings.lookToClose
+      ? 'While looking closes them is on, moving the mouse onto the eyes no longer closes them'
+      : 'Turning on "Looking Into the Eyes Closes Them" also turns the mouse-on-the-eyes rule off',
+    enabled: false,
+  });
   return { label: 'Closing', type: 'submenu', submenu: items };
 }
 

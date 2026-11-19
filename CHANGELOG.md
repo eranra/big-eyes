@@ -3,6 +3,17 @@
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.6.7] - 2026-11-19
+
+### Fixed
+
+- **Look-to-close was being preempted by the mouse.** With *Looking Into the Eyes Closes Them* on, moving the
+  pointer onto the eyes still closed them at once, so the chosen look time (for example 5 s) never got to
+  finish — the app log showed every hide as "pointer-in-eyes", never as look-to-close. While look-to-close is
+  on, the mouse-on-the-eyes rule is now off: the look is the goodbye. A key press or a click still closes the
+  eyes, and an explicit *any mouse movement* choice still applies. The look timer itself was verified by a new
+  test: with a 5-second setting the eyes close only after the full 5 seconds of continuous eye contact.
+
 ## [0.6.6] - 2026-11-19
 
 ### Fixed

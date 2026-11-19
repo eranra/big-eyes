@@ -34,6 +34,15 @@ export interface IdleInput {
 /** Why the overlay was hidden. Useful for logs and tests. */
 export type HideReason = 'input' | 'pointer-in-eyes' | 'pointer-moved' | 'blocked' | 'forced';
 
+/**
+ * The mouse rule that applies while the eyes are shown. With look-to-close on, moving the pointer onto
+ * the eyes no longer closes them — the look is the goodbye, so the gaze timer gets to finish.
+ * A key press or a click always closes the eyes, and an explicit "any mouse movement" choice still applies.
+ */
+export function effectiveMouseRule(mouseRule: MouseRule, lookToClose: boolean): MouseRule {
+  return lookToClose && mouseRule === 'onto-eyes' ? 'never' : mouseRule;
+}
+
 export class IdleMonitor {
   timeout: number;
   isShowing = false;
