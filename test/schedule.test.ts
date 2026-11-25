@@ -37,19 +37,26 @@ describe('withinSchedule', () => {
     expect(normalizeSettings({ scheduleStart: '99:99' }).scheduleEnd).toBe('17:00');
   });
 
-  it('the tray menu shows the working-hours toggle', async () => {
+  it('the tray menu shows the working-hours toggle, with custom times', async () => {
     const { defaultSettings, mergeSettings } = await import('../src/core/settings');
     const { buildMenuModel } = await import('../src/main/menu-model');
     const menu = buildMenuModel(mergeSettings(defaultSettings(), { scheduleEnabled: true }), [], [], 'darwin');
     const item = menu.find((n) => n.label === 'Working Hours 09:00–17:00');
     expect(item).toBeDefined();
     expect(item!.checked).toBe(true);
+    const custom = buildMenuModel(
+      mergeSettings(defaultSettings(), { scheduleEnabled: true, scheduleStart: '10:30', scheduleEnd: '19:00' }),
+      [],
+      [],
+      'darwin',
+    );
+    expect(custom.find((n) => n.label === 'Working Hours 10:30–19:00')).toBeDefined();
   });
 
-  it('outside the window the eyes are blocked with the reason', async () => {
-    // The blocked reason flows from main; here we pin the core decision the main process uses.
-    const s = { scheduleEnabled: true, scheduleStart: '09:00', scheduleEnd: '17:00' };
-    const outside = at(20, 0);
-    expect(withinSchedule(s, outside)).toBe(false);
+  it('invalid times in a hand-edited file fall back to the defaults', async () => {
+    const { normalizeSettings } = await import('../src/core/settings');
+    const s = normalizeSettings({ scheduleEnabled: true, scheduleStart: '9:00', scheduleEnd: '99:99' });
+    expect(s.scheduleStart).toBe('09:00');
+    expect(s.scheduleEnd).toBe('17:00');
   });
 });

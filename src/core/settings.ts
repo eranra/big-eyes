@@ -719,7 +719,7 @@ function customMessages(v: unknown, fallback: string[]): string[] {
 
 /** A time of day 'HH:MM'; anything invalid falls back. */
 function timeOfDay(v: unknown, fallback: string): string {
-  return typeof v === 'string' && /^([01]?\d|2[0-3]):([0-5]\d)$/.test(v.trim()) ? v.trim() : fallback;
+  return typeof v === 'string' && /^([01]\d|2[0-3]):([0-5]\d)$/.test(v.trim()) ? v.trim() : fallback;
 }
 
 function look(v: unknown, d: LookSettings): LookSettings {

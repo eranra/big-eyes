@@ -344,8 +344,16 @@ const languageSelect = $<HTMLSelectElement>('messageLanguage');
 languageSelect.addEventListener('change', () => save({ messageLanguage: languageSelect.value }, 0));
 const scheduleStart = $<HTMLInputElement>('scheduleStart');
 const scheduleEnd = $<HTMLInputElement>('scheduleEnd');
-scheduleStart.addEventListener('change', () => save({ scheduleStart: scheduleStart.value }, 0));
-scheduleEnd.addEventListener('change', () => save({ scheduleEnd: scheduleEnd.value }, 0));
+scheduleStart.addEventListener('change', () => {
+  // An empty field would silently fall back to the default (and could flip an overnight
+  // window); keep the previous value instead.
+  if (scheduleStart.value === '') scheduleStart.value = settings.scheduleStart;
+  else save({ scheduleStart: scheduleStart.value }, 0);
+});
+scheduleEnd.addEventListener('change', () => {
+  if (scheduleEnd.value === '') scheduleEnd.value = settings.scheduleEnd;
+  else save({ scheduleEnd: scheduleEnd.value }, 0);
+});
 const customArea = $<HTMLTextAreaElement>('customMessages');
 const customMessagesValue = (): string[] => customArea.value.split('\n').map((l) => l.trim()).filter(Boolean);
 customArea.addEventListener('input', () => save({ customMessages: customMessagesValue() }, 500));
