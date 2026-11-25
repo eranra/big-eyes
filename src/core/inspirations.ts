@@ -60,7 +60,9 @@ export const HAPPY_MESSAGES_HE: readonly string[] = [
 export type InspirationPosition = 'top' | 'bottom' | 'center';
 
 /** The message list for a language, with the user's own messages added. */
-export function messagesFor(s: Pick<InspirationSettings, 'messageLanguage' | 'customMessages'>): readonly string[] {
+export function messagesFor(
+  s: Pick<InspirationSettings, 'messageLanguage'> & { customMessages?: readonly string[] },
+): readonly string[] {
   const base = s.messageLanguage === 'he' ? HAPPY_MESSAGES_HE : HAPPY_MESSAGES;
   const custom = s.customMessages ?? [];
   if (!custom.length) return base;
