@@ -62,19 +62,20 @@ describe('wake-up personality', () => {
     expect(a.pose.smile).toBeLessThan(0.35);
   });
 
-  it('a short detection gap (inside the absence grace) does not restart the absence clock', () => {
+  it('a short detection gap (inside the absence grace) does not fake a return', () => {
     const a = new EyeAnimator(defaultSettings(), 6);
     // Person present for 6 minutes with a 1 s dropout in the middle (grace is 1.2 s).
+    // They never left, so there is no return and no welcome.
     let t = 0;
     let frame = 0;
-    while (t < 360) {
+    while (t < 361.2) {
       const gap = t > 180 && t <= 181;
       if (frame++ % 3 === 0) a.ingest(gap ? [] : [awayFace()], t);
       a.update(t);
       t += 1 / 60;
     }
-    simulate(a, [awayFace()], 360, 1.2);
-    expect(a.pose.smile).toBeGreaterThan(0.5); // ~359 s of real presence still counts as "away"
+    expect(a.person.isPresent).toBe(true);
+    expect(a.pose.smile).toBeLessThan(0.35);
   });
 
   it('a seeded absence from a previous eye session carries into a fresh animator', () => {
