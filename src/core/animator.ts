@@ -157,6 +157,10 @@ export class EyeAnimator {
   private inspirationGaze: Vec2 | null = null;
   /** Time of the last blink we mirrored from the person. */
   private lastMirrorBlinkAt = -Infinity;
+  /** When the current yawn started (on falling asleep), or null. */
+  private yawnStart: number | null = null;
+  /** How long a yawn lasts. */
+  private static readonly YAWN_SECONDS = 1.6;
 
   constructor(settings: Settings = defaultSettings(), seed = 42, now = 0) {
     this.settings = settings;
@@ -267,6 +271,18 @@ export class EyeAnimator {
     this.mouthOpen.target = shape.mouth.open * (delighted ? 0.6 + 0.4 * mirror : 1) + (delighted ? Math.sin(now * 7.3) * 0.05 : 0);
     this.mouthWidth.target = shape.mouth.width * (delighted ? 0.9 + 0.15 * mirror : 1);
     this.mouthAlpha.target = this.settings.look.showMouth ? 1 : 0;
+    // Yawn: as the eyes fall asleep the mouth opens wide once, the lids droop, a little inhale.
+    if (this.yawnStart !== null) {
+      const ty = now - this.yawnStart;
+      if (ty >= EyeAnimator.YAWN_SECONDS) {
+        this.yawnStart = null;
+      } else {
+        const e = Math.sin((Math.PI * ty) / EyeAnimator.YAWN_SECONDS); // 0 → 1 → 0
+        this.mouthOpen.target = Math.max(this.mouthOpen.target, e * 0.85);
+        this.upperLid.target = Math.max(this.upperLid.target, 0.35 + e * 0.4);
+        this.scaleSpring.target += e * 0.03;
+      }
+    }
     for (const s of [
       this.upperLid,
       this.smile,
@@ -399,6 +415,8 @@ export class EyeAnimator {
         if (this.rng.next() < 0.7) this.blinks.trigger(now);
         break;
       case 'sleeping':
+        // Falling asleep begins with a yawn.
+        this.yawnStart = now;
         break;
     }
     this.nextSaccadeAt = now;
