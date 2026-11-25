@@ -66,19 +66,20 @@ export function drawSeason(ctx: CanvasRenderingContext2D, width: number, height:
     const x = Math.sin(i * 127.1 + 311.7) * 43758.5453;
     return x - Math.floor(x);
   };
+  // The golden-ratio spread keeps the particles evenly spaced across the width (a plain
+  // integer hash clusters); the hash adds a little per-particle jitter and the speeds.
+  const spread = (i: number): number => (i * 0.618033988749895) % 1;
   ctx.save();
   for (let i = 0; i < COUNT; i++) {
     const h1 = hash(i);
     const h2 = hash(i + 50);
-    const speed = 18 + h1 * 22; // pixels per second
+    const speed = 18 + h2 * 22; // pixels per second (from an independent hash, not the x position)
     const size = 3 + h2 * 4;
-    let x: number;
+    const x = (spread(i) + h1 * 0.03 + Math.sin(time * 0.5 + i * 2.1) * 0.015) * width;
     let y: number;
     if (season === 'hearts') {
-      x = (h1 * 1.3 + Math.sin(time * 0.7 + i) * 0.015) * width;
       y = height + 20 - ((time * speed + h2 * height) % (height + 60));
     } else {
-      x = (h1 + Math.sin(time * 0.5 + i * 2.1) * 0.02) * width;
       y = ((time * speed + h2 * height) % (height + 40)) - 20;
     }
     const alpha = 0.1 + h2 * 0.14;
@@ -97,7 +98,7 @@ export function drawSeason(ctx: CanvasRenderingContext2D, width: number, height:
       ctx.ellipse(0, 0, size, size * 0.45, 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
-    } else {
+    } else if (season === 'hearts') {
       ctx.fillStyle = 'rgba(230, 90, 130, 1)';
       ctx.save();
       ctx.translate(x, y);

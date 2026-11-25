@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { seasonFor } from '../src/core/season';
+import { drawSeason } from '../src/renderer/draw';
 
 describe('seasonFor', () => {
   it('December snows', () => {
@@ -30,54 +31,91 @@ describe('seasonFor', () => {
 });
 
 describe('drawSeason', () => {
-  it('renders particles for each season and nothing without one', async () => {
-    const { drawSeason } = await import('../src/renderer/draw');
-    const makeCtx = (): { ctx: CanvasRenderingContext2D; fills: number[] } => {
-      const fills: number[] = [];
-      const ctx = {
-        fill: () => fills.push(1), stroke: () => {}, save() {}, restore() {}, beginPath() {},
-        closePath() {}, moveTo() {}, lineTo() {}, bezierCurveTo() {}, quadraticCurveTo() {},
-        ellipse() {}, arc() {}, clip() {}, rect() {}, roundRect() {}, fillRect() {}, clearRect() {},
-        translate() {}, rotate() {}, scale() {}, setTransform() {}, fillText() {}, strokeText() {},
-        measureText: () => ({ width: 10 }),
-        createRadialGradient: () => ({ addColorStop() {} }),
-        createLinearGradient: () => ({ addColorStop() {} }),
-      } as unknown as CanvasRenderingContext2D;
-      return { ctx, fills };
-    };
+  interface Spy {
+    ctx: CanvasRenderingContext2D;
+    fills: number[];
+    points: Array<{ x: number; y: number }>;
+  }
+  const makeCtx = (): Spy => {
+    const fills: number[] = [];
+    const points: Array<{ x: number; y: number }> = [];
+    const ctx = {
+      fill: () => fills.push(1), stroke: () => {}, save() {}, restore() {}, beginPath() {},
+      closePath() {}, moveTo() {}, lineTo() {}, bezierCurveTo() {}, quadraticCurveTo() {},
+      ellipse: (x: number, y: number) => points.push({ x, y }),
+      arc: (x: number, y: number) => points.push({ x, y }),
+      clip() {}, rect() {}, roundRect() {}, fillRect() {}, clearRect() {}, translate: (x: number, y: number) => points.push({ x, y }),
+      rotate() {}, scale() {}, setTransform() {}, fillText() {}, strokeText() {},
+      measureText: () => ({ width: 10 }),
+      createRadialGradient: () => ({ addColorStop() {} }),
+      createLinearGradient: () => ({ addColorStop() {} }),
+    } as unknown as CanvasRenderingContext2D;
+    return { ctx, fills, points };
+  };
+
+  it('renders exactly 14 particles per season, and nothing without one', () => {
     for (const season of ['snow', 'leaves', 'hearts'] as const) {
       const { ctx, fills } = makeCtx();
       drawSeason(ctx, 900, 700, 3.5, season);
-      expect(fills.length).toBeGreaterThan(5);
+      expect(fills.length).toBe(14);
     }
     const { ctx, fills } = makeCtx();
     drawSeason(ctx, 900, 700, 3.5, null);
     expect(fills.length).toBe(0);
   });
 
-  it('particles move over time (falling snow reaches lower over time)', async () => {
-    const { drawSeason } = await import('../src/renderer/draw');
-    // Deterministic positions: spy on ellipse/arc y coordinates at two times.
-    const positions: number[] = [];
-    const ctx = {
-      fill: () => {}, stroke: () => {}, save() {}, restore() {}, beginPath() {}, closePath() {},
-      moveTo() {}, lineTo() {}, bezierCurveTo() {}, quadraticCurveTo() {},
-      ellipse: (_x: number, y: number) => positions.push(y), arc: (_x: number, y: number) => positions.push(y),
-      clip() {}, rect() {}, roundRect() {}, fillRect() {}, clearRect() {}, translate() {}, rotate() {},
-      scale() {}, setTransform() {}, fillText() {}, strokeText() {},
-      measureText: () => ({ width: 10 }),
-      createRadialGradient: () => ({ addColorStop() {} }),
-      createLinearGradient: () => ({ addColorStop() {} }),
-    } as unknown as CanvasRenderingContext2D;
-    drawSeason(ctx, 900, 700, 0, 'snow');
-    const at0 = [...positions];
-    positions.length = 0;
-    drawSeason(ctx, 900, 700, 5, 'snow');
-    expect(at0.length).toBe(positions.length);
-    let moved = 0;
-    for (let i = 0; i < positions.length; i++) {
-      if (Math.abs(positions[i]! - at0[i]!) > 0.5) moved++;
+  it('every particle stays on the canvas', () => {
+    for (const season of ['snow', 'leaves', 'hearts'] as const) {
+      const { ctx, points } = makeCtx();
+      drawSeason(ctx, 900, 700, 42.7, season);
+      for (const p of points) {
+        expect(p.x).toBeGreaterThanOrEqual(0);
+        expect(p.x).toBeLessThanOrEqual(900);
+        expect(p.y).toBeGreaterThanOrEqual(-20);
+        expect(p.y).toBeLessThanOrEqual(720);
+      }
+      expect(points.length).toBeGreaterThan(0);
+      for (const p of points) {
+        expect(p.x).toBeGreaterThanOrEqual(0);
+        expect(p.x).toBeLessThanOrEqual(900);
+        expect(p.y).toBeGreaterThanOrEqual(-20);
+        expect(p.y).toBeLessThanOrEqual(720);
+      }
     }
-    expect(moved).toBeGreaterThan(3); // most particles fell
+  });
+
+  it('the same time renders exactly the same particles (deterministic)', () => {
+    const a = makeCtx();
+    const b = makeCtx();
+    drawSeason(a.ctx, 900, 700, 123.4, 'snow');
+    drawSeason(b.ctx, 900, 700, 123.4, 'snow');
+    expect(a.points).toEqual(b.points);
+  });
+
+  it('snow falls and hearts rise', () => {
+    const snowEarly = makeCtx();
+    drawSeason(snowEarly.ctx, 900, 700, 0, 'snow');
+    const snowLate = makeCtx();
+    drawSeason(snowLate.ctx, 900, 700, 5, 'snow');
+    // Snow: later means lower (bigger y), and positions are in the same order per particle.
+    let fell = 0;
+    for (let i = 0; i < 14; i++) {
+      const d = snowLate.points[i]!.y - snowEarly.points[i]!.y;
+      // Fell, or wrapped past the bottom back to the top (a large negative jump).
+      if (d > 1 || d < -300) fell++;
+    }
+    expect(fell).toBeGreaterThanOrEqual(13);
+
+    const heartEarly = makeCtx();
+    drawSeason(heartEarly.ctx, 900, 700, 0, 'hearts');
+    const heartLate = makeCtx();
+    drawSeason(heartLate.ctx, 900, 700, 5, 'hearts');
+    let rose = 0;
+    for (let i = 0; i < 14; i++) {
+      const d = heartLate.points[i]!.y - heartEarly.points[i]!.y;
+      // Rose, or wrapped past the top back to the bottom (a large positive jump).
+      if (d < -1 || d > 300) rose++;
+    }
+    expect(rose).toBeGreaterThanOrEqual(13);
   });
 });
