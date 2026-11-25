@@ -392,7 +392,8 @@ export class EyeAnimator {
       this.reactionKind = null;
     }
     if (this.musicOn) {
-      this.scaleSpring.target += Math.sin(now * 2.4) * 0.012;
+      // Bob at ~2.4 Hz (angular frequency: 2.4 * 2π rad/s), gentle.
+      this.scaleSpring.target += Math.sin(now * 2.4 * 2 * Math.PI) * 0.012;
       this.smile.target = Math.max(this.smile.target, 0.15);
     }
     // Yawn: as the eyes fall asleep the mouth opens wide once and the lids droop in two stages —

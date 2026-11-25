@@ -52,9 +52,19 @@ export class IdleMonitor {
   private baseIdle = 0;
   /** After a dismissal, wait for a new idle period before showing again. */
   private armed = true;
+  private showListeners: Array<() => void> = [];
 
   constructor(timeout: number) {
     this.timeout = timeout;
+  }
+
+  /** Called every time the eyes appear (also on "Show eyes now"). */
+  onShow(listener: () => void): void {
+    this.showListeners.push(listener);
+  }
+
+  private fireShow(): void {
+    for (const l of this.showListeners) l();
   }
 
   update({
@@ -111,6 +121,7 @@ export class IdleMonitor {
     this.lastHideReason = null;
     this.baseTime = now;
     this.baseIdle = idleSeconds;
+    this.fireShow();
   }
 
   private hide(reason: HideReason): IdleEvent {

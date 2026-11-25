@@ -42,7 +42,7 @@ describe('animator reactions', () => {
     expect(a.pose.upperLid).toBeLessThan(0.4);
   });
 
-  it('music makes the eyes bob gently', async () => {
+  it('music makes the eyes bob gently at ~2.4 Hz', async () => {
     const { EyeAnimator, defaultSettings } = await import('../src/core');
     const a = new EyeAnimator(defaultSettings(), 3);
     a.setMusic(true);
@@ -51,7 +51,8 @@ describe('animator reactions', () => {
     const quiet = new EyeAnimator(defaultSettings(), 3);
     const quietScales: number[] = [];
     for (let t = 0; t < 4; t += 1 / 60) quietScales.push(quiet.update(t).scale);
-    // The bob shows up as a clear rhythm at ~2.4 Hz: the scale crosses its midpoint often.
+    // The bob shows up as a clear rhythm: many midpoint crossings (2.4 Hz = ~19 in 4 s,
+    // the spring smooths some; anything above 8 is clearly rhythmic, not breathing).
     const mid = (Math.max(...scales) + Math.min(...scales)) / 2;
     let crossings = 0;
     for (let i = 1; i < scales.length; i++) {
@@ -62,8 +63,8 @@ describe('animator reactions', () => {
     for (let i = 1; i < quietScales.length; i++) {
       if ((quietScales[i - 1]! - quietMid) * (quietScales[i]! - quietMid) < 0) quietCrossings++;
     }
-    expect(crossings).toBeGreaterThan(quietCrossings);
-    expect(crossings).toBeGreaterThanOrEqual(3); // at least 3 bob cycles in 4 s
+    expect(crossings).toBeGreaterThan(quietCrossings + 4);
+    expect(crossings).toBeGreaterThanOrEqual(8);
     expect(Math.max(...scales) - Math.min(...scales)).toBeGreaterThan(0.015); // visible
   });
 

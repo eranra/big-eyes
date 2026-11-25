@@ -172,16 +172,19 @@ function startSystemReactions(): void {
   };
   pollPower();
   setInterval(pollPower, 30_000);
-  // Audio: poll every 30 s while the eyes are shown.
-  setInterval(() => {
-    if (!idle.isShowing) return;
+  // Audio: poll every 15 s while the eyes are shown, and resend the state whenever they
+  // appear again (a fresh animator starts with music off).
+  const pollMusic = (force = false): void => {
+    if (!idle.isShowing && !force) return;
     void audioPlaying(ownPids()).then((playing) => {
-      if (playing !== wasMusic) {
+      if (playing !== wasMusic || force) {
         wasMusic = playing;
         sendToOverlays(IPC.music, playing);
       }
     });
-  }, 30_000);
+  };
+  setInterval(() => pollMusic(), 15_000);
+  idle.onShow(() => pollMusic(true));
   // Screenshots: watch the folder while the app runs.
   watchScreenshots(() => {
     eventLog('reaction: squint (screenshot)');
@@ -1169,6 +1172,7 @@ void app.whenReady().then(async () => {
   });
 
   setInterval(() => void checkIdle(), 100);
+  startSystemReactions();
 
   if (SHOW_AT_START) setTimeout(show, 1200);
   // Testing aid: start camera-by-camera calibration right away.

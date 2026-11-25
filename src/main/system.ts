@@ -338,8 +338,10 @@ export async function isACPower(): Promise<boolean> {
 
 /**
  * Parses `pmset -g assertions` for audio: a NoIdleSleepAssertion means some app asks the system
- * not to sleep. Music players hold one while playing; video players hold display assertions,
- * which do not count as music. Exported for tests.
+ * not to sleep — music players do this while playing, and so do some non-audio processes
+ * (downloads, WebRTC calls). Best effort: true means "probably music". Video players hold
+ * display assertions too, which we do not count (the eyes stay away during video anyway).
+ * Exported for tests.
  */
 export function parseAudioPlaying(output: string | null): boolean {
   if (!output) return false;
