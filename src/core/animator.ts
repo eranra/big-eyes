@@ -155,6 +155,8 @@ export class EyeAnimator {
   private readonly phase: number;
   private inspirationGlanceUntil = 0;
   private inspirationGaze: Vec2 | null = null;
+  /** Time of the last blink we mirrored from the person. */
+  private lastMirrorBlinkAt = -Infinity;
 
   constructor(settings: Settings = defaultSettings(), seed = 42, now = 0) {
     this.settings = settings;
@@ -290,6 +292,17 @@ export class EyeAnimator {
     this.blinks.slowness = mood === 'bored' ? 1.7 : mood === 'sleeping' ? 2.5 : 1;
     this.blinks.intervalScale = mood === 'happy' || mood === 'delighted' ? 0.8 : mood === 'bored' ? 1.4 : 1;
     this.blinks.enabled = mood !== 'sleeping';
+    // Blink back: mirror the person's blink, at most once per 0.7 s so closed eyes do not cause a flicker.
+    if (
+      person.isPresent &&
+      person.personBlink > 0.45 &&
+      mood !== 'sleeping' &&
+      this.blinks.enabled &&
+      now - this.lastMirrorBlinkAt > 0.7
+    ) {
+      this.lastMirrorBlinkAt = now;
+      this.blinks.trigger(now);
+    }
     const blink = this.blinks.closure(now);
 
     if (this.messageOverride !== null) this.captionText = this.messageOverride;

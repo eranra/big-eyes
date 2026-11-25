@@ -145,6 +145,7 @@ export class MultiCameraAttention {
       isSmiling: present.some((x) => x.s.isSmiling),
       contactSeconds: Math.max(0, ...present.map((x) => x.s.contactSeconds)),
       smileContactSeconds: Math.max(0, ...present.map((x) => x.s.smileContactSeconds)),
+      personBlink: Math.max(0, ...present.map((x) => x.s.personBlink)),
       lastSeen: Math.max(...present.map((x) => x.s.lastSeen ?? 0)),
     };
   }

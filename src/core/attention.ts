@@ -24,6 +24,8 @@ export interface PersonState {
   contactSeconds: number;
   /** Seconds that smile and eye contact have been seen together on one camera (longest current run). */
   smileContactSeconds: number;
+  /** How closed the person's eyes are right now, 0 (open) .. 1 (closed). Used to blink back. */
+  personBlink: number;
   /** Time (s) of the last face detection. */
   lastSeen: number | null;
 }
@@ -38,6 +40,7 @@ export const ABSENT: Readonly<PersonState> = Object.freeze({
   isSmiling: false,
   contactSeconds: 0,
   smileContactSeconds: 0,
+  personBlink: 0,
   lastSeen: null,
 });
 
@@ -129,6 +132,7 @@ export class AttentionEstimator {
     const position = this.screenPosition(face);
     const raw = this.contactAllowed ? this.rawContactScore(face) : 0;
     const st = this.state;
+    st.personBlink = face.blink;
     if (st.isPresent) {
       const k = smoothingFactor(dt, this.settings.positionSmoothing);
       st.position = lerpVec(st.position, position, k);
@@ -164,6 +168,7 @@ export class AttentionEstimator {
     const k = smoothingFactor(dt, this.settings.contactSmoothing * 2);
     this.state.contactScore = lerp(this.state.contactScore, 0, k);
     this.state.smile = lerp(this.state.smile, 0, k);
+    this.state.personBlink = 0;
     this.updateDecisions(now);
     this.tick(now);
   }
