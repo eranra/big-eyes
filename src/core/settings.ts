@@ -197,6 +197,8 @@ export interface Settings {
   showHands: boolean;
   /** Minutes of continuous presence before a stretch nudge; 0 = off. */
   breakReminderMinutes: number;
+  /** Message language: 'he' shows Hebrew, right-to-left. */
+  messageLanguage: 'en' | 'he';
   attention: AttentionSettings;
   mood: MoodSettings;
 }
@@ -551,6 +553,7 @@ export function defaultSettings(): Settings {
     inspirationsDuration: 8,
     showHands: false,
     breakReminderMinutes: 45,
+    messageLanguage: 'en',
     mirrorCamera: false,
     respectVideoPlayback: true,
     openAtLogin: false,
@@ -756,6 +759,7 @@ export function normalizeSettings(input: unknown): Settings {
     inspirationsDuration: num(s.inspirationsDuration, d.inspirationsDuration, 1, 30),
     showHands: bool(s.showHands, d.showHands),
     breakReminderMinutes: Math.round(num(s.breakReminderMinutes, d.breakReminderMinutes, 0, 240)),
+    messageLanguage: oneOf(s.messageLanguage, ['en', 'he'] as const, d.messageLanguage),
     mirrorCamera: bool(s.mirrorCamera, d.mirrorCamera),
     respectVideoPlayback: bool(s.respectVideoPlayback, d.respectVideoPlayback),
     openAtLogin: bool(s.openAtLogin, d.openAtLogin),

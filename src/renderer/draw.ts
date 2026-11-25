@@ -844,6 +844,8 @@ function drawInspiration(ctx: CanvasRenderingContext2D, width: number, height: n
   ctx.save();
   ctx.font = `800 ${size}px ui-rounded, "SF Pro Rounded", "Nunito", "Segoe UI", system-ui, sans-serif`;
   ctx.letterSpacing = `${size * 0.02}px`;
+  // Hebrew renders right-to-left; the canvas direction makes the bidi order correct.
+  ctx.direction = insp.rtl ? 'rtl' : 'ltr';
   const lines = wrapLines(ctx, insp.text, maxWidth);
   const lineHeight = size * 1.18;
   const totalH = lines.length * lineHeight;

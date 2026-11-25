@@ -340,6 +340,8 @@ const BREAK_PRESETS: ReadonlyArray<{ label: string; value: number }> = [
 ];
 for (const p of BREAK_PRESETS) breakSelect.append(new Option(p.label, String(p.value)));
 breakSelect.addEventListener('change', () => save({ breakReminderMinutes: Number(breakSelect.value) }, 0));
+const languageSelect = $<HTMLSelectElement>('messageLanguage');
+languageSelect.addEventListener('change', () => save({ messageLanguage: languageSelect.value }, 0));
 const blurStrength = $<HTMLInputElement>('blurStrength');
 blurStrength.addEventListener('input', () => {
   (blurStrength.nextElementSibling as HTMLOutputElement).value = `${Math.round(Number(blurStrength.value) * 100)}%`;
@@ -391,6 +393,7 @@ function renderBehavior(next: Settings): void {
     breakSelect.append(new Option(`${next.breakReminderMinutes} minutes`, String(next.breakReminderMinutes)));
   }
   breakSelect.value = String(next.breakReminderMinutes);
+  languageSelect.value = next.messageLanguage;
   afterEyesSelect.value = next.afterEyes;
   afterEyesSelect.disabled = next.screenSaver !== 'replace';
   const preset = AFTER_EYES_DELAY_PRESETS.some((p) => p.value === next.afterEyesMinutes);
