@@ -89,7 +89,42 @@ describe('DreamScheduler', () => {
     const pose = staticPose('sleeping', settings);
     pose.dream = { kind: 'heart', startTime: 0 };
     const l = eyeLayout(900, 700, pose, 1, settings.look, 'center');
-    drawDreams(ctx, l, pose.dream, 1.5);
+    drawDreams(ctx, l, pose, 1.5);
+    expect(fills.length).toBeGreaterThan(0);
+  });
+
+  /**
+   * Production wiring: the animator runs on an absolute clock (performance.now()/1000) and
+   * drawEyes must receive that same clock, or a dream's age is negative and it never renders.
+   */
+  it('a live dream renders through drawEyes on the production clock', async () => {
+    const { drawEyes } = await import('../src/renderer/draw');
+    const { EyeAnimator, defaultSettings } = await import('../src/core');
+    const pageLoad = 3598.4; // an absolute clock base, like a real overlay
+    const a = new EyeAnimator(defaultSettings(), 123, pageLoad);
+    let dreamAt: number | null = null;
+    for (let t = pageLoad; t < pageLoad + 20 && dreamAt === null; t += 1 / 60) {
+      if (a.update(t).dream) dreamAt = t;
+    }
+    expect(dreamAt).not.toBeNull();
+    const fills: number[] = [];
+    const ctx = {
+      fill: () => fills.push(1), stroke: () => {}, save() {}, restore() {}, beginPath() {},
+      closePath() {}, moveTo() {}, lineTo() {}, bezierCurveTo() {}, quadraticCurveTo() {},
+      ellipse() {}, arc() {}, clip() {}, rect() {}, roundRect() {}, fillRect() {}, clearRect() {},
+      translate() {}, rotate() {}, scale() {}, setTransform() {}, fillText() {}, strokeText() {},
+      measureText: () => ({ width: 10 }),
+      createRadialGradient: () => ({ addColorStop() {} }),
+      createLinearGradient: () => ({ addColorStop() {} }),
+    } as unknown as CanvasRenderingContext2D;
+    const now = dreamAt! + 1.5; // mid-bubble
+    const pose = a.update(now);
+    drawEyes(ctx, 900, 700, pose, {
+      irisColor: defaultSettings().irisColor,
+      look: defaultSettings().look,
+      eyeSize: 1,
+      time: now, // the same absolute clock
+    });
     expect(fills.length).toBeGreaterThan(0);
   });
 });

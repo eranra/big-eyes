@@ -294,7 +294,8 @@ function frame(): void {
     look: settings.look,
     eyeSize: settings.eyeSize,
     position: settings.position,
-    time: now - startTime,
+    // The absolute animator clock: dream bubbles and message drift measure time from it.
+    time: now,
     debug: settings.showDebugInfo ? debugText() : null,
   });
 }

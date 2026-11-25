@@ -140,7 +140,7 @@ export function drawEyes(ctx: CanvasRenderingContext2D, width: number, height: n
   drawCaption(ctx, l, pose, look.glowColor);
   if (pose.inspiration && pose.inspiration.opacity > 0.01) drawInspiration(ctx, width, height, pose, o.time, l);
   if (pose.sleepOpacity > 0.01) drawSleep(ctx, l, pose, o.time);
-  if (pose.dream) drawDreams(ctx, l, pose.dream, o.time);
+  if (pose.dream) drawDreams(ctx, l, pose, o.time);
   if (o.debug) drawDebug(ctx, o.debug, height);
 }
 
@@ -753,11 +753,14 @@ export function drawHands(ctx: CanvasRenderingContext2D, width: number, l: EyeLa
 }
 
 /** A dream bubble: a small star or heart floating up beside the sleeping eyes. */
-export function drawDreams(ctx: CanvasRenderingContext2D, l: EyeLayout, bubble: DreamBubble, time: number): void {
+export function drawDreams(ctx: CanvasRenderingContext2D, l: EyeLayout, pose: EyePose, time: number): void {
+  const bubble = pose.dream;
+  if (!bubble) return;
   const age = time - bubble.startTime;
   if (age < 0 || age > DREAM_LIFETIME) return;
   const p = age / DREAM_LIFETIME; // 0 → 1 over its life
-  const alpha = Math.sin(Math.PI * p); // fade in and out
+  // Fade in and out, and fade with the sleep itself so the bubble does not pop when someone appears.
+  const alpha = Math.sin(Math.PI * p) * clampNumber(pose.sleepOpacity, 0, 1);
   if (alpha <= 0.01) return;
   const size = l.rx * (0.16 + 0.08 * p);
   // Rises from beside the right eye, drifting up with a gentle sway.
