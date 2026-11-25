@@ -3,6 +3,27 @@
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.7.0] - 2026-11-25
+
+### Added
+
+- **Blink back** — the eyes blink when you blink.
+- **Yawn before sleeping** — as the eyes fall asleep, the mouth opens wide once and the lids droop in two stages.
+- **Dream bubbles** — a small star or heart occasionally floats up from the sleeping eyes.
+- **Warm welcome** — after five minutes or more away, the eyes greet you with a big smile and a bounce, even before
+  you look at them. The absence is remembered across hidden stretches.
+- **The eyes watch the cursor** — while nobody is in front of the camera, the eyes occasionally glance toward your
+  last mouse movement.
+- **Stretch reminder** — after a chosen time of continuous presence (45 minutes by default; off at 0), the eyes
+  suggest a stretch with "Time to stretch?" and a pointing hand. A real break (20 s or more away) resets it.
+- **Hebrew happy messages** — a message-language setting (English or עברית) with right-to-left rendering; custom
+  messages are detected per message, not per language.
+- **Your own messages** — a text area in Settings adds your messages to the built-in ones.
+- **Working hours** — show the eyes only inside a time window; overnight windows (22:00–06:00) work too.
+- **Seasonal sparkle** — snowflakes in December, leaves in autumn, hearts on February 14.
+- **System reactions** — a relieved smile when the power connects, a brief squint on a screenshot, and a gentle bob
+  while music plays in another app.
+
 ## [0.6.7] - 2026-11-19
 
 ### Fixed
