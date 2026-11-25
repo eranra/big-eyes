@@ -165,6 +165,13 @@ export class EyeAnimator {
   private yawnStart: number | null = null;
   /** How long a yawn lasts. */
   private static readonly YAWN_SECONDS = 1.6;
+  /** Time since the person was last seen, while they are away. */
+  private goneSince: number | null = null;
+  /** While `now < welcomeUntil` the eyes show a warm welcome (after a long absence). */
+  private welcomeUntil = 0;
+  /** An absence this long (s) counts as "you were really gone". */
+  private static readonly WELCOME_ABSENCE = 300;
+  private static readonly WELCOME_SECONDS = 2.2;
 
   constructor(settings: Settings = defaultSettings(), seed = 42, now = 0) {
     this.settings = settings;
@@ -227,6 +234,20 @@ export class EyeAnimator {
 
     const eligible = mood === 'sleeping' || mood === 'bored';
     const inspiration = this.inspirations.update(now, eligible);
+
+    // Wake-up personality: after a long absence, the return gets a warm welcome.
+    if (person.isPresent) {
+      if (this.goneSince !== null) {
+        if (now - this.goneSince >= EyeAnimator.WELCOME_ABSENCE && mood !== 'sleeping') {
+          this.welcomeUntil = now + EyeAnimator.WELCOME_SECONDS;
+          this.scaleSpring.velocity += 1.2; // a happy bounce
+          this.browLift.velocity += 3;
+        }
+        this.goneSince = null;
+      }
+    } else {
+      this.goneSince ??= now;
+    }
     const prevInsp = this.pose.inspiration;
     if (inspiration && (!prevInsp || inspiration.text !== prevInsp.text)) {
       this.startInspirationGlance(inspiration, now);
@@ -269,6 +290,12 @@ export class EyeAnimator {
     this.convergence.target = person.isPresent ? clamp((person.size - 0.2) * 2, 0, 1) : 0;
     this.browLift.target = shape.browLift;
     this.browTilt.target = shape.browTilt;
+    // The welcome after a long absence: warm smile and raised brows even without eye contact.
+    if (now < this.welcomeUntil && mood !== 'sleeping') {
+      this.smile.target = Math.max(this.smile.target, 0.7);
+      this.browLift.target = Math.max(this.browLift.target, 0.55);
+      this.pupil.target = Math.max(this.pupil.target, 1.25);
+    }
     // Mouth: follows the mood. When delighted it mirrors how much the person smiles, with a small "talking" wobble.
     const delighted = mood === 'delighted';
     const mirror = delighted ? clamp(person.smile, 0, 1) : 0;
