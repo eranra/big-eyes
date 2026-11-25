@@ -25,7 +25,10 @@ let settings: Settings = defaultSettings();
 let animator = new EyeAnimator(settings, (Math.random() * 2 ** 31) | 0, performance.now() / 1000);
 let visible = false;
 let frameHandle = 0;
-/** When the person was last seen, kept across eye sessions so a long time away still welcomes them back. */
+/** When the person was last seen, kept across eye sessions so a long time away still welcomes them back.
+ *  Refreshed while hidden whenever any camera sees them (presence checks in the tracker window,
+ *  broadcasts in the mirrors). Note: with "Wait while I'm looking" off, no camera runs while the
+ *  eyes are hidden, so a hidden stretch always counts as absence — the eyes never saw the person. */
 let lastPersonSeen: number | null = null;
 
 /** Camera-by-camera calibration: the queue of cameras still to do, the one being recorded, and its samples. */
@@ -89,6 +92,9 @@ if (tracker) {
 }
 api.onFaces(({ faces, time, cameras, openCameras }) => {
   if (openCameras) animator.setCameras(openCameras);
+  // The tracker window's clock is not ours (each window has its own time origin), so stamp
+  // sightings with the local clock. While hidden, seeing the person is not an absence.
+  if (!visible && faces.length) lastPersonSeen = performance.now() / 1000;
   animator.ingest(faces, time, cameras);
 });
 
