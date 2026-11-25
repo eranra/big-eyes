@@ -201,6 +201,10 @@ export interface Settings {
   messageLanguage: 'en' | 'he';
   /** The user's own happy messages, one per line; empty means built-in only. */
   customMessages: string[];
+  /** Show the eyes only inside this time window. */
+  scheduleEnabled: boolean;
+  scheduleStart: string;
+  scheduleEnd: string;
   attention: AttentionSettings;
   mood: MoodSettings;
 }
@@ -557,6 +561,9 @@ export function defaultSettings(): Settings {
     breakReminderMinutes: 45,
     messageLanguage: 'en',
     customMessages: [],
+    scheduleEnabled: false,
+    scheduleStart: '09:00',
+    scheduleEnd: '17:00',
     mirrorCamera: false,
     respectVideoPlayback: true,
     openAtLogin: false,
@@ -710,6 +717,11 @@ function customMessages(v: unknown, fallback: string[]): string[] {
   return [...new Set(clean)].slice(0, 100);
 }
 
+/** A time of day 'HH:MM'; anything invalid falls back. */
+function timeOfDay(v: unknown, fallback: string): string {
+  return typeof v === 'string' && /^([01]\d|2[0-3]):([0-5]\d)$/.test(v.trim()) ? v.trim() : fallback;
+}
+
 function look(v: unknown, d: LookSettings): LookSettings {
   const l = isObj(v) ? v : {};
   return {
@@ -773,6 +785,9 @@ export function normalizeSettings(input: unknown): Settings {
     breakReminderMinutes: Math.round(num(s.breakReminderMinutes, d.breakReminderMinutes, 0, 240)),
     messageLanguage: oneOf(s.messageLanguage, ['en', 'he'] as const, d.messageLanguage),
     customMessages: customMessages(s.customMessages, d.customMessages),
+    scheduleEnabled: bool(s.scheduleEnabled, d.scheduleEnabled),
+    scheduleStart: timeOfDay(s.scheduleStart, d.scheduleStart),
+    scheduleEnd: timeOfDay(s.scheduleEnd, d.scheduleEnd),
     mirrorCamera: bool(s.mirrorCamera, d.mirrorCamera),
     respectVideoPlayback: bool(s.respectVideoPlayback, d.respectVideoPlayback),
     openAtLogin: bool(s.openAtLogin, d.openAtLogin),

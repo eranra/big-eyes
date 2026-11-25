@@ -114,8 +114,8 @@ const numberFields: Record<NumberField, (v: number) => string> = {
   backgroundDim: (v) => (v === 0 ? 'none' : `${Math.round(v * 100)}%`),
   idleTimeout: formatSeconds,
 };
-type BoolField = 'showInspirations' | 'showHands' | 'respectVideoPlayback' | 'openAtLogin' | 'paused' | 'mirrorCamera' | 'showDebugInfo' | 'waitWhileWatched';
-const boolFields: BoolField[] = ['showInspirations', 'showHands', 'respectVideoPlayback', 'openAtLogin', 'paused', 'mirrorCamera', 'showDebugInfo', 'waitWhileWatched'];
+type BoolField = 'showInspirations' | 'showHands' | 'respectVideoPlayback' | 'openAtLogin' | 'paused' | 'mirrorCamera' | 'showDebugInfo' | 'waitWhileWatched' | 'scheduleEnabled';
+const boolFields: BoolField[] = ['showInspirations', 'showHands', 'respectVideoPlayback', 'openAtLogin', 'paused', 'mirrorCamera', 'showDebugInfo', 'waitWhileWatched', 'scheduleEnabled'];
 
 let saveTimer = 0;
 function save(patch: Record<string, unknown>, delay = 150): void {
@@ -342,6 +342,18 @@ for (const p of BREAK_PRESETS) breakSelect.append(new Option(p.label, String(p.v
 breakSelect.addEventListener('change', () => save({ breakReminderMinutes: Number(breakSelect.value) }, 0));
 const languageSelect = $<HTMLSelectElement>('messageLanguage');
 languageSelect.addEventListener('change', () => save({ messageLanguage: languageSelect.value }, 0));
+const scheduleStart = $<HTMLInputElement>('scheduleStart');
+const scheduleEnd = $<HTMLInputElement>('scheduleEnd');
+scheduleStart.addEventListener('change', () => {
+  // An empty field would silently fall back to the default (and could flip an overnight
+  // window); keep the previous value instead.
+  if (scheduleStart.value === '') scheduleStart.value = settings.scheduleStart;
+  else save({ scheduleStart: scheduleStart.value }, 0);
+});
+scheduleEnd.addEventListener('change', () => {
+  if (scheduleEnd.value === '') scheduleEnd.value = settings.scheduleEnd;
+  else save({ scheduleEnd: scheduleEnd.value }, 0);
+});
 const customArea = $<HTMLTextAreaElement>('customMessages');
 const customMessagesValue = (): string[] => customArea.value.split('\n').map((l) => l.trim()).filter(Boolean);
 customArea.addEventListener('input', () => save({ customMessages: customMessagesValue() }, 500));
@@ -406,6 +418,9 @@ function renderBehavior(next: Settings): void {
   breakSelect.value = String(next.breakReminderMinutes);
   languageSelect.value = next.messageLanguage;
   if (document.activeElement !== customArea) customArea.value = next.customMessages.join('\n');
+  scheduleStart.disabled = scheduleEnd.disabled = !next.scheduleEnabled;
+  if (document.activeElement !== scheduleStart) scheduleStart.value = next.scheduleStart;
+  if (document.activeElement !== scheduleEnd) scheduleEnd.value = next.scheduleEnd;
   afterEyesSelect.value = next.afterEyes;
   afterEyesSelect.disabled = next.screenSaver !== 'replace';
   const preset = AFTER_EYES_DELAY_PRESETS.some((p) => p.value === next.afterEyesMinutes);

@@ -394,6 +394,12 @@ export function buildMenuModel(
     screensMenu(settings, displays),
     inspirationsMenu(settings),
     breakMenu(settings),
+    {
+      label: `Working Hours ${settings.scheduleStart}–${settings.scheduleEnd}`,
+      type: 'checkbox',
+      checked: settings.scheduleEnabled,
+      action: patch({ scheduleEnabled: !settings.scheduleEnabled }),
+    },
     handsMenu(settings),
     separator,
     {
