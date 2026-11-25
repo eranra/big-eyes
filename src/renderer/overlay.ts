@@ -25,6 +25,11 @@ let settings: Settings = defaultSettings();
 let animator = new EyeAnimator(settings, (Math.random() * 2 ** 31) | 0, performance.now() / 1000);
 let visible = false;
 let frameHandle = 0;
+/** When the person was last seen, kept across eye sessions so a long time away still welcomes them back.
+ *  Refreshed while hidden whenever any camera sees them (presence checks in the tracker window,
+ *  broadcasts in the mirrors). Note: with "Wait while I'm looking" off, no camera runs while the
+ *  eyes are hidden, so a hidden stretch always counts as absence — the eyes never saw the person. */
+let lastPersonSeen: number | null = null;
 
 /** Camera-by-camera calibration: the queue of cameras still to do, the one being recorded, and its samples. */
 let calibrationQueue: Array<{ index: number; label: string; id: string }> = [];
@@ -55,7 +60,11 @@ if (tracker) {
   tracker.onFaces = (faces, time, cameras) => {
     const openCameras = tracker.openCameras;
     animator.setCameras(openCameras);
-    if (presenceActive && !visible) api.sendPresenceFaces({ faces, cameras, openCameras });
+    if (presenceActive && !visible) {
+      // Someone is reading in front of the hidden eyes: that is not an absence.
+      if (faces.length) lastPersonSeen = time;
+      api.sendPresenceFaces({ faces, cameras, openCameras });
+    }
     if (settings.showDebugInfo && time - lastLog > 1) {
       lastLog = time;
       const f = faces[0];
@@ -83,6 +92,9 @@ if (tracker) {
 }
 api.onFaces(({ faces, time, cameras, openCameras }) => {
   if (openCameras) animator.setCameras(openCameras);
+  // The tracker window's clock is not ours (each window has its own time origin), so stamp
+  // sightings with the local clock. While hidden, seeing the person is not an absence.
+  if (!visible && faces.length) lastPersonSeen = performance.now() / 1000;
   animator.ingest(faces, time, cameras);
 });
 
@@ -140,9 +152,11 @@ function setVisible(next: boolean): void {
   visible = next;
   document.body.classList.toggle('visible', next);
   if (next) {
-    // A fresh animator each time, so the eyes wake up from closed.
+    // A fresh animator each time, so the eyes wake up from closed. The time the person was last
+    // seen carries over, so a return after a long hidden stretch still gets the warm welcome.
     const now = performance.now() / 1000;
     animator = new EyeAnimator(settings, (Math.random() * 2 ** 31) | 0, now);
+    animator.seedAbsence(lastPersonSeen);
     animator.wakeUp(now);
     closeRequested = false;
     if (api.role?.guidedTest && !calibrationPending) guidedStart = now;
@@ -281,6 +295,7 @@ function frame(): void {
   const step = guidedStep(now);
   if (step) animator.messageOverride = step.text;
   const pose = animator.update(now);
+  if (animator.person.isPresent) lastPersonSeen = now;
   reportEyeArea(pose, now);
   if (animator.wantsToClose && !closeRequested) {
     closeRequested = true;
