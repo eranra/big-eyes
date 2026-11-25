@@ -87,16 +87,44 @@ describe('CursorGlancer', () => {
 
   it('the animator glances toward the cursor in its gaze (nobody present)', async () => {
     const { EyeAnimator, defaultSettings } = await import('../src/core');
-    const a = new EyeAnimator(defaultSettings(), 12);
-    // Nobody there; the pointer sits far to the right of the screen and keeps moving.
-    for (let t = 0; t < 6; t += 1 / 60) {
-      if (Math.round(t * 60) % 30 === 0) a.cursor.noteCursor(0.95, 0.5, t);
-      const pose = a.update(t);
-      if (t > 0.2) {
-        // At some point the gaze must swing to the right (the idle wandering stays within ±0.8).
-        if (pose.gaze.x > 0.5) return; // a glance happened
-      }
+    // Same seed, two runs: with and without cursor sightings. The cursor run must look
+    // further right than idle wandering alone ever does.
+    const control = new EyeAnimator(defaultSettings(), 12);
+    const watching = new EyeAnimator(defaultSettings(), 12);
+    let controlMax = 0;
+    let watchingMax = 0;
+    for (let t = 0; t < 2.4; t += 1 / 60) {
+      // Before bored (2.5 s), so the wandering stays in the curious range.
+      if (Math.round(t * 60) % 30 === 0) watching.cursor.noteCursor(0.95, 0.5, t);
+      controlMax = Math.max(controlMax, control.update(t).gaze.x);
+      watchingMax = Math.max(watchingMax, watching.update(t).gaze.x);
     }
-    throw new Error('no cursor glance happened in 6 seconds');
+    expect(watchingMax).toBeGreaterThan(controlMax + 0.1);
+    expect(watchingMax).toBeGreaterThan(0.8); // clearly toward the pointer, not a wander
+  });
+
+  it('losing the person does not fire a glance at once', () => {
+    const g = new CursorGlancer(7);
+    // Person present for a while (arms a wait), then gone; a fresh cursor sighting exists.
+    g.noteCursor(0.9, 0.5, 0);
+    for (let t = 0; t < 10; t += 1 / 60) g.update(t, true);
+    g.noteCursor(0.9, 0.5, 10);
+    // The first frames after the loss must not glance (the wait was armed).
+    for (let t = 10; t < 10.3; t += 1 / 60) {
+      expect(g.update(t, false)).toBeNull();
+    }
+  });
+
+  it('the cursor resuming after a stale spell waits before glancing again', () => {
+    const g = new CursorGlancer(8);
+    g.noteCursor(0.9, 0.5, 0);
+    // Fresh until 1.5 s, then stale until 8 s, then fresh again from 8 s.
+    for (let t = 0; t < 8; t += 1 / 60) g.update(t, false);
+    g.noteCursor(0.9, 0.5, 8);
+    let glanced = false;
+    for (let t = 8; t < 8.3; t += 1 / 60) {
+      if (g.update(t, false)) glanced = true;
+    }
+    expect(glanced).toBe(false); // the resume waits, it does not burst
   });
 });

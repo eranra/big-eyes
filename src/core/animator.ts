@@ -264,7 +264,8 @@ export class EyeAnimator {
     this.updateFixation(person, mood, now, inspiration);
 
     // When nobody is there, the eyes occasionally glance toward the cursor instead.
-    const cursorGlance = this.cursor.update(now, person.isPresent);
+    // Never during the goodbye wink: the person just left, and the eyes are saying bye.
+    const cursorGlance = this.cursor.update(now, person.isPresent || this.goodbyeAt !== null);
 
     if (this.inspirationGaze && (now < this.inspirationGlanceUntil || inspiration)) {
       const gazeTarget = this.inspirationGaze;

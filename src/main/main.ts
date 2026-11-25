@@ -561,8 +561,9 @@ async function checkIdle(): Promise<void> {
       lastCursor = cursor;
       const areas = overlays.flatMap((o) => (o.eyeArea ? [o.eyeArea] : []));
       pointerInEyes = pointInRects(cursor, areas, EYE_AREA_MARGIN);
-      // The eyes watch the cursor: tell the overlay on that screen where the pointer is.
-      if (pointerMoved && now - lastCursorSend >= 0.1) {
+      // The eyes watch the cursor: tell the overlay on that screen where the pointer is
+      // (not while it rests on the eyes themselves).
+      if (pointerMoved && !pointerInEyes && now - lastCursorSend >= 0.1) {
         lastCursorSend = now;
         for (const o of overlays) {
           if (o.window.isDestroyed()) continue;

@@ -30,8 +30,10 @@ export class CursorGlancer {
   update(now: number, present: boolean): Vec2 | null {
     if (now >= this.glanceEnd) this.active = null;
     if (present) {
+      // The eyes follow the person; arm a wait so losing them does not fire a glance at once.
       this.active = null;
       this.cursor = null;
+      this.nextGlanceAt = Math.max(this.nextGlanceAt, now + this.rng.range(0.4, 1.2));
       return null;
     }
     const fresh = this.cursor && now - this.cursor.time <= 1.5 ? this.cursor : null;
