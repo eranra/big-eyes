@@ -13,6 +13,7 @@ const person = (contact: boolean): PersonState => ({
   isSmiling: false,
   contactSeconds: 0,
   smileContactSeconds: 0,
+  personBlink: 0,
   lastSeen: 0,
 });
 

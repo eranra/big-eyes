@@ -134,6 +134,7 @@ describe('the first camera to reach it wins: moods, look-to-close, waiting', () 
       isSmiling: smileContactSeconds > 0,
       contactSeconds,
       smileContactSeconds,
+      personBlink: 0,
       lastSeen: 0,
     });
     const mood = new MoodMachine();
