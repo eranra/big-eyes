@@ -1,4 +1,6 @@
 import type { EyePose } from '../core/animator';
+import type { DreamBubble } from '../core/dreams';
+import { DREAM_LIFETIME } from '../core/dreams';
 import { INSPIRATION_COLORS } from '../core/inspirations';
 import { clampLength, lerp, smoothstep } from '../core/math';
 import { THEMES, type EyePosition, type LookSettings } from '../core/settings';
@@ -26,7 +28,7 @@ export interface DrawOptions {
   eyeSize: number;
   /** Where on the screen the eyes sit. Default center. */
   position?: EyePosition;
-  /** Seconds since start, for the sleep "z" animation. */
+  /** The animator's absolute clock (the same base as the dream and inspiration start times). */
   time: number;
   /** Debug text drawn in the corner, or null. */
   debug?: string | null;
@@ -38,6 +40,15 @@ export interface EyeLayout {
   rx: number;
   ry: number;
   spacing: number;
+}
+
+/**
+ * The draw options for one frame. The renderer must receive the animator's ABSOLUTE clock as `time`
+ * (the same base as dream and inspiration `startTime`s) — building options through this helper
+ * keeps every page on that contract.
+ */
+export function frameOptions(now: number, o: Omit<DrawOptions, 'time'>): DrawOptions {
+  return { ...o, time: now };
 }
 
 /** Width and height factors of each eye shape. */
@@ -138,6 +149,7 @@ export function drawEyes(ctx: CanvasRenderingContext2D, width: number, height: n
   drawCaption(ctx, l, pose, look.glowColor);
   if (pose.inspiration && pose.inspiration.opacity > 0.01) drawInspiration(ctx, width, height, pose, o.time, l);
   if (pose.sleepOpacity > 0.01) drawSleep(ctx, l, pose, o.time);
+  if (pose.dream) drawDreams(ctx, l, pose, o.time);
   if (o.debug) drawDebug(ctx, o.debug, height);
 }
 
@@ -747,6 +759,46 @@ export function drawHands(ctx: CanvasRenderingContext2D, width: number, l: EyeLa
   };
   drawHand(-1);
   drawHand(1);
+}
+
+/** A dream bubble: a small star or heart floating up beside the sleeping eyes. */
+export function drawDreams(ctx: CanvasRenderingContext2D, l: EyeLayout, pose: EyePose, time: number): void {
+  const bubble = pose.dream;
+  if (!bubble) return;
+  const age = time - bubble.startTime;
+  if (age < 0 || age > DREAM_LIFETIME) return;
+  const p = age / DREAM_LIFETIME; // 0 → 1 over its life
+  // Fade in and out, and fade with the sleep itself so the bubble does not pop when someone appears.
+  const alpha = Math.sin(Math.PI * p) * clampNumber(pose.sleepOpacity, 0, 1);
+  if (alpha <= 0.01) return;
+  const size = l.rx * (0.16 + 0.08 * p);
+  // Rises from beside the right eye, drifting up with a gentle sway.
+  const x = l.cx + l.spacing + l.rx * (0.6 + 0.5 * p) + Math.sin(p * 5.2) * l.rx * 0.12;
+  const y = l.cy - l.ry * (0.4 + p * 1.5);
+  ctx.save();
+  ctx.globalAlpha = alpha * 0.85;
+  ctx.fillStyle = bubble.kind === 'heart' ? 'rgba(255, 130, 160, 0.9)' : 'rgba(255, 225, 140, 0.9)';
+  if (bubble.kind === 'heart') {
+    ctx.beginPath();
+    const w = size * 0.55;
+    ctx.moveTo(x, y + w * 0.45);
+    ctx.bezierCurveTo(x - w, y - w * 0.35, x - w * 0.45, y - w, x, y - w * 0.45);
+    ctx.bezierCurveTo(x + w * 0.45, y - w, x + w, y - w * 0.35, x, y + w * 0.45);
+    ctx.fill();
+  } else {
+    ctx.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const a = (Math.PI / 5) * i - Math.PI / 2;
+      const r = i % 2 === 0 ? size * 0.55 : size * 0.24;
+      const px = x + Math.cos(a) * r;
+      const py = y + Math.sin(a) * r;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
 }
 
 function wrapLines(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {

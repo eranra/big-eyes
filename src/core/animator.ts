@@ -3,6 +3,7 @@ import { MultiCameraAttention, type OpenCamera } from './multicamera';
 import { BlinkScheduler } from './blink';
 import type { FaceObservation } from './face';
 import { HandScheduler, type HandPose, type HandSettings } from './hand';
+import { DreamScheduler, type DreamBubble } from './dreams';
 import { InspirationScheduler, type ActiveInspiration, type InspirationSettings } from './inspirations';
 import { add, clamp, clampLength, lerpVec, scale, SeededRandom, type Vec2 } from './math';
 import { MoodMachine, type Mood } from './mood';
@@ -56,6 +57,8 @@ export interface EyePose {
   /** Tiny alive wobble for the mouth, -1..1. */
   mouthAlive: number;
   hands: HandPose;
+  /** A dream bubble floating up while sleeping, or null. */
+  dream: DreamBubble | null;
 }
 
 /** Target look of each mood. The animator moves toward these values with springs. */
@@ -147,6 +150,7 @@ export class EyeAnimator {
 
   readonly inspirations: InspirationScheduler;
   readonly hands: HandScheduler;
+  readonly dreams: DreamScheduler;
   private fixation: Vec2 = { x: 0, y: 0 };
   private nextSaccadeAt = 0;
   private captionText = '';
@@ -170,6 +174,7 @@ export class EyeAnimator {
     this.rng = new SeededRandom(seed);
     this.inspirations = new InspirationScheduler(settings as InspirationSettings, seed + 2);
     this.hands = new HandScheduler(settings as unknown as HandSettings, seed + 3);
+    this.dreams = new DreamScheduler(seed + 4);
     this.startTime = now;
     this.phase = this.rng.range(0, Math.PI * 2);
     this.pose = this.buildPose(0);
@@ -330,15 +335,23 @@ export class EyeAnimator {
     this.sleepBubble.step(dt);
 
     const handPose = this.hands.update(now, mood, inspiration, this.settings.showHands);
+    const dream = this.dreams.update(now, mood === 'sleeping');
     const mouthAlive =
       Math.sin(now * 1.1 + this.phase) * 0.015 + Math.sin(now * 0.53 + this.phase * 1.3) * 0.008;
     const breathing =
       Math.sin(t * (mood === 'sleeping' ? 1.1 : 1.6) + this.phase) * (mood === 'sleeping' ? 0.018 : 0.008);
-    this.pose = this.buildPose(blink, breathing, inspiration, mouthAlive, handPose);
+    this.pose = this.buildPose(blink, breathing, inspiration, mouthAlive, handPose, dream);
     return this.pose;
   }
 
-  private buildPose(blink: number, breathing = 0, inspiration: ActiveInspiration | null = null, mouthAlive = 0, handPose: HandPose | null = null): EyePose {
+  private buildPose(
+    blink: number,
+    breathing = 0,
+    inspiration: ActiveInspiration | null = null,
+    mouthAlive = 0,
+    handPose: HandPose | null = null,
+    dream: DreamBubble | null = null,
+  ): EyePose {
     const lid = clamp(this.upperLid.value, 0, 1);
     return {
       gaze: this.gaze.value,
@@ -365,6 +378,7 @@ export class EyeAnimator {
       inspiration,
       mouthAlive,
       hands: handPose ?? { gesture: 'rest', lift: 0, spread: 0, rotation: 0, opacity: 0, yJitter: 0 },
+      dream,
     };
   }
 
@@ -507,5 +521,6 @@ export function staticPose(mood: Mood, settings: Settings = defaultSettings()): 
     inspiration: null,
     mouthAlive: 0,
     hands: { gesture: 'rest', lift: 0, spread: 0, rotation: 0, opacity: 0, yJitter: 0 },
+    dream: null,
   };
 }

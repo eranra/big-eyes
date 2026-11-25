@@ -5,7 +5,7 @@ import type { CameraInfo } from '../core/ipc';
 import type { BigEyesApi, DisplaySummary } from '../core/ipc';
 import type { Mood } from '../core/mood';
 import { defaultSettings, EYE_SHAPES, IRIS_PRESETS, MOUSE_RULES, POSITIONS, PUPIL_SHAPES, SCREEN_SAVER_MODES, BLUR_MODES, SCREEN_SAVER_TIME_PRESETS, AFTER_EYES_ACTIONS, AFTER_EYES_DELAY_PRESETS, IRIS_STYLES, matchingTheme, THEMES, type LookSettings, type Settings } from '../core/settings';
-import { drawEyes } from './draw';
+import { drawEyes, frameOptions } from './draw';
 import { FaceTracker } from './tracker';
 
 declare global {
@@ -92,7 +92,7 @@ function frame(): void {
   const pose = animator.update(now);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   // The preview is small: scale the eyes like on a screen, limited by the preview height.
-  drawEyes(ctx, w, h, pose, { irisColor: settings.irisColor, look: settings.look, eyeSize: Math.min(settings.eyeSize, 1.25), time: now - start });
+  drawEyes(ctx, w, h, pose, frameOptions(now, { irisColor: settings.irisColor, look: settings.look, eyeSize: Math.min(settings.eyeSize, 1.25) }));
 }
 requestAnimationFrame(frame);
 

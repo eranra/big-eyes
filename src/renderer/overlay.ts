@@ -2,7 +2,7 @@ import { EyeAnimator } from '../core/animator';
 import { averageReference } from '../core/attention';
 import type { BigEyesApi } from '../core/ipc';
 import { defaultSettings, type GazeReference, type Settings } from '../core/settings';
-import { drawEyes, eyeBounds, eyeLayout } from './draw';
+import { drawEyes, eyeBounds, eyeLayout, frameOptions } from './draw';
 import { FaceTracker } from './tracker';
 
 declare global {
@@ -25,7 +25,6 @@ let settings: Settings = defaultSettings();
 let animator = new EyeAnimator(settings, (Math.random() * 2 ** 31) | 0, performance.now() / 1000);
 let visible = false;
 let frameHandle = 0;
-const startTime = performance.now() / 1000;
 
 /** Camera-by-camera calibration: the queue of cameras still to do, the one being recorded, and its samples. */
 let calibrationQueue: Array<{ index: number; label: string; id: string }> = [];
@@ -289,14 +288,19 @@ function frame(): void {
   }
   const dpr = window.devicePixelRatio || 1;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  drawEyes(ctx, window.innerWidth, window.innerHeight, pose, {
-    irisColor: settings.irisColor,
-    look: settings.look,
-    eyeSize: settings.eyeSize,
-    position: settings.position,
-    time: now - startTime,
-    debug: settings.showDebugInfo ? debugText() : null,
-  });
+  drawEyes(
+    ctx,
+    window.innerWidth,
+    window.innerHeight,
+    pose,
+    frameOptions(now, {
+      irisColor: settings.irisColor,
+      look: settings.look,
+      eyeSize: settings.eyeSize,
+      position: settings.position,
+      debug: settings.showDebugInfo ? debugText() : null,
+    }),
+  );
 }
 
 // The main process turns the blur on when the screen saver time is reached (or at once in "always" mode).

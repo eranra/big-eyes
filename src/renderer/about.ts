@@ -2,7 +2,7 @@ import { EyeAnimator } from '../core/animator';
 import type { AboutInfo, BigEyesApi } from '../core/ipc';
 import { defaultSettings } from '../core/settings';
 import { ISSUES_URL, RELEASES_URL, REPO_URL } from '../core/update';
-import { drawEyes } from './draw';
+import { drawEyes, frameOptions } from './draw';
 
 declare global {
   interface Window {
@@ -42,7 +42,7 @@ function frame(): void {
   }
   const pose = animator.update(now);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  drawEyes(ctx, w, h, { ...pose, mouthOpacity: 0 }, { irisColor: settings.irisColor, look: settings.look, eyeSize: 1.15, time: now });
+  drawEyes(ctx, w, h, { ...pose, mouthOpacity: 0 }, frameOptions(now, { irisColor: settings.irisColor, look: settings.look, eyeSize: 1.15 }));
 }
 requestAnimationFrame(frame);
 
