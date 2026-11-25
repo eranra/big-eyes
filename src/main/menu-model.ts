@@ -341,6 +341,24 @@ export function handsMenu(settings: Settings): MenuNode {
   };
 }
 
+/** The stretch nudge: after this many minutes of continuous presence, suggest a break. */
+export function breakMenu(settings: Settings): MenuNode {
+  return presetMenu(
+    'Stretch Reminder',
+    [
+      { label: 'Off', value: 0 },
+      { label: '15 minutes', value: 15 },
+      { label: '30 minutes', value: 30 },
+      { label: '45 minutes', value: 45 },
+      { label: '1 hour', value: 60 },
+      { label: '90 minutes', value: 90 },
+    ],
+    settings.breakReminderMinutes,
+    near,
+    (v) => ({ breakReminderMinutes: v }),
+  );
+}
+
 const toggle = (label: string, checked: boolean, key: keyof Settings): MenuNode => ({
   label,
   type: 'checkbox',
@@ -375,6 +393,7 @@ export function buildMenuModel(
     cameraMenu(settings, cameras),
     screensMenu(settings, displays),
     inspirationsMenu(settings),
+    breakMenu(settings),
     handsMenu(settings),
     separator,
     {
