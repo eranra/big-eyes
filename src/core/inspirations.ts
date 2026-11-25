@@ -28,12 +28,48 @@ export const HAPPY_MESSAGES: readonly string[] = [
   'Life is beautiful!',
 ];
 
+/** The same messages in Hebrew, shown when the message language is Hebrew. */
+export const HAPPY_MESSAGES_HE: readonly string[] = [
+  'אתה מדהים!',
+  'המשך להאיר!',
+  'תחייך — העולם צריך את זה!',
+  'אתה עושה שינוי!',
+  'היום זה היום שלך!',
+  'תאמין בעצמך!',
+  'אוהבים אותך!',
+  'חלום גדול!',
+  'תישאר מדהים!',
+  'אתה תסתדר!',
+  'פזר טוב סביבך!',
+  'תהיה הגרסה הכי טובה שלך!',
+  'קסם נמצא בתוכך!',
+  'אתה מאיר את החדר!',
+  'תמשיך — אתה מדליק!',
+  'האושר יפה עליך!',
+  'אי אפשר לעצור אותך!',
+  'תעשה את היום נפלא!',
+  'החיוך שלך יפה!',
+  'תישאר סקרן, תישאר טוב!',
+  'אתה מעורר השראה!',
+  'כל יום הזדמנות חדשה!',
+  'אתה אמיץ יותר ממה שאתה חושב!',
+  'תאיר חזק!',
+  'החיים יפים!',
+];
+
 export type InspirationPosition = 'top' | 'bottom' | 'center';
+
+/** The message list for a language: Hebrew for 'he', English otherwise. */
+export function messagesFor(s: Pick<InspirationSettings, 'messageLanguage'>): readonly string[] {
+  return s.messageLanguage === 'he' ? HAPPY_MESSAGES_HE : HAPPY_MESSAGES;
+}
 
 export interface InspirationSettings {
   showInspirations: boolean;
   inspirationsInterval: number;
   inspirationsDuration: number;
+  /** Message language: 'he' shows the Hebrew list, right-to-left. */
+  messageLanguage: 'en' | 'he';
 }
 
 export interface ActiveInspiration {
@@ -43,6 +79,8 @@ export interface ActiveInspiration {
   colorIndex: number;
   sizeFactor: number;
   startTime: number;
+  /** True when the text is right-to-left (Hebrew). */
+  rtl: boolean;
 }
 
 export const INSPIRATION_COLORS: readonly string[] = [
@@ -136,18 +174,20 @@ export class InspirationScheduler {
   }
 
   private startNew(now: number): void {
+    const messages = messagesFor(this.settings);
     let idx: number;
     do {
-      idx = Math.floor(this.rng.next() * HAPPY_MESSAGES.length);
-    } while (HAPPY_MESSAGES.length > 1 && idx === this.lastIndex);
+      idx = Math.floor(this.rng.next() * messages.length);
+    } while (messages.length > 1 && idx === this.lastIndex);
     this.lastIndex = idx;
     this.active = {
-      text: HAPPY_MESSAGES[idx]!,
+      text: messages[idx]!,
       position: this.rng.pick([...INSPIRATION_POSITIONS]),
       opacity: 0,
       colorIndex: Math.floor(this.rng.next() * INSPIRATION_COLORS.length),
       sizeFactor: this.rng.range(1.15, 1.6),
       startTime: now,
+      rtl: this.settings.messageLanguage === 'he',
     };
     this.phase = 'showing';
     this.phaseStart = now;

@@ -286,6 +286,7 @@ export class EyeAnimator {
             colorIndex: 0,
             sizeFactor: 1,
             startTime: this.nudgeUntil - BREAK_NUDGE_SECONDS,
+            rtl: false,
           }
         : inspiration;
     const prevInsp = this.pose.inspiration;
