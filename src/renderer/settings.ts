@@ -343,9 +343,15 @@ breakSelect.addEventListener('change', () => save({ breakReminderMinutes: Number
 const languageSelect = $<HTMLSelectElement>('messageLanguage');
 languageSelect.addEventListener('change', () => save({ messageLanguage: languageSelect.value }, 0));
 const customArea = $<HTMLTextAreaElement>('customMessages');
-customArea.addEventListener('input', () => {
-  const list = customArea.value.split('\n').map((l) => l.trim()).filter(Boolean);
-  save({ customMessages: list }, 500);
+const customMessagesValue = (): string[] => customArea.value.split('\n').map((l) => l.trim()).filter(Boolean);
+customArea.addEventListener('input', () => save({ customMessages: customMessagesValue() }, 500));
+// Leaving the field saves at once (the shared save timer could be cancelled by another
+// control) and writes the normalized value back, so limits are visible.
+customArea.addEventListener('blur', () => {
+  void api.updateSettings({ customMessages: customMessagesValue() }).then((s) => {
+    customArea.value = s.customMessages.join('\n');
+    render(s);
+  });
 });
 const blurStrength = $<HTMLInputElement>('blurStrength');
 blurStrength.addEventListener('input', () => {

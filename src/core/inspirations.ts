@@ -189,14 +189,17 @@ export class InspirationScheduler {
       idx = Math.floor(this.rng.next() * messages.length);
     } while (messages.length > 1 && idx === this.lastIndex);
     this.lastIndex = idx;
+    const text = messages[idx]!;
     this.active = {
-      text: messages[idx]!,
+      text,
       position: this.rng.pick([...INSPIRATION_POSITIONS]),
       opacity: 0,
       colorIndex: Math.floor(this.rng.next() * INSPIRATION_COLORS.length),
       sizeFactor: this.rng.range(1.15, 1.6),
       startTime: now,
-      rtl: this.settings.messageLanguage === 'he',
+      // Right-to-left per message, not per language: a Hebrew custom message renders correctly
+      // even in English mode, and an English one in Hebrew mode stays left-to-right.
+      rtl: /[\u0590-\u05FF]/.test(text),
     };
     this.phase = 'showing';
     this.phaseStart = now;

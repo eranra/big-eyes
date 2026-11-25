@@ -32,19 +32,52 @@ describe('custom messages', () => {
       inspirationsDuration: 5,
     });
     const sched = new InspirationScheduler(s, 3);
-    const seen: string[] = [];
-    let last: string | null = null;
+    // Record every message start (a new active with a fresh startTime), not text changes:
+    // asserting on text changes could never see a repeat in the first place.
+    const starts: string[] = [];
+    let lastStart = -1;
     for (let t = 0; t < 200; t += 1 / 60) {
       const m = sched.update(t, true);
-      if (m && m.text !== last) {
-        seen.push(m.text);
-        last = m.text;
+      if (m && m.startTime !== lastStart) {
+        starts.push(m.text);
+        lastStart = m.startTime;
       }
     }
-    expect(seen).toContain('Custom A!');
-    expect(seen).toContain('Custom B!');
-    // No immediate repeat of the same message.
-    for (let i = 1; i < seen.length; i++) expect(seen[i]).not.toBe(seen[i - 1]);
+    expect(starts).toContain('Custom A!');
+    expect(starts).toContain('Custom B!');
+    for (let i = 1; i < starts.length; i++) expect(starts[i]).not.toBe(starts[i - 1]);
+  });
+
+  it('a Hebrew custom message renders right-to-left even in English mode', async () => {
+    const { InspirationScheduler } = await import('../src/core/inspirations');
+    const { defaultSettings, mergeSettings } = await import('../src/core/settings');
+    const s = mergeSettings(defaultSettings(), {
+      messageLanguage: 'en',
+      customMessages: ['רק שלי!'],
+      inspirationsInterval: 3,
+    });
+    const sched = new InspirationScheduler(s, 7);
+    let mine = null;
+    for (let t = 0; t < 400; t += 1 / 60) {
+      const m = sched.update(t, true);
+      if (m?.text === 'רק שלי!') {
+        mine = m;
+        break;
+      }
+    }
+    expect(mine).not.toBeNull();
+    expect(mine!.rtl).toBe(true);
+  });
+
+  it('deduplication: duplicate lines collapse; a built-in copy merges into the pool', async () => {
+    const { defaultSettings, mergeSettings } = await import('../src/core/settings');
+    const s = mergeSettings(defaultSettings(), { customMessages: ['Same!', 'Same!', 'You are amazing!'] });
+    // Duplicates among the customs collapse (settings level).
+    expect(s.customMessages).toEqual(['Same!', 'You are amazing!']);
+    // A custom identical to a built-in does not double the pool (scheduler level).
+    const combined = messagesFor({ messageLanguage: 'en', customMessages: s.customMessages });
+    expect(combined.filter((m) => m === 'You are amazing!').length).toBe(1);
+    expect(combined.filter((m) => m === 'Same!').length).toBe(1);
   });
 
   it('a fully custom list replaces the pool it draws from often', async () => {
