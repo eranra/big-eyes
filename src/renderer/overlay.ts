@@ -328,6 +328,9 @@ function frame(): void {
 api.onBlur((on) => document.body.classList.toggle('blur', on));
 // The eyes watch the cursor while nobody is in front of the camera.
 api.onCursor((pos) => animator.cursor.noteCursor(pos.x, pos.y, performance.now() / 1000));
+// System reactions: charging (relieved), screenshot (squint), music (a gentle bob).
+api.onReaction((kind) => animator.react(kind, performance.now() / 1000));
+api.onMusic((on) => animator.setMusic(on));
 api.onSettings(applySettings);
 api.onVisibility(setVisible);
 api.onCalibrate((camera) => {
