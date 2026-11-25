@@ -15,7 +15,7 @@ describe('custom messages', () => {
   });
 
   it('custom messages extend the built-in list', () => {
-    const combined = messagesFor({ customMessages: ['My own line!'] });
+    const combined = messagesFor({ messageLanguage: 'en', customMessages: ['My own line!'] });
     expect(combined).toContain('My own line!');
     expect(combined.length).toBe(HAPPY_MESSAGES.length + 1);
   });
