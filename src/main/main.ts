@@ -141,6 +141,8 @@ const afterEyes = new AfterEyesTimer();
 let afterEyesRunning = false;
 let lastAfterEyesCheck = 0;
 let lastActivityLog = 0;
+/** Last time the cursor place was sent to an overlay (rate limited). */
+let lastCursorSend = 0;
 let lastBlockLog = 0;
 /** Whether the overlays are blurred right now. */
 let blurOn = false;
@@ -559,6 +561,20 @@ async function checkIdle(): Promise<void> {
       lastCursor = cursor;
       const areas = overlays.flatMap((o) => (o.eyeArea ? [o.eyeArea] : []));
       pointerInEyes = pointInRects(cursor, areas, EYE_AREA_MARGIN);
+      // The eyes watch the cursor: tell the overlay on that screen where the pointer is
+      // (not while it rests on the eyes themselves).
+      if (pointerMoved && !pointerInEyes && now - lastCursorSend >= 0.1) {
+        lastCursorSend = now;
+        for (const o of overlays) {
+          if (o.window.isDestroyed()) continue;
+          const b = o.window.getBounds();
+          if (cursor.x < b.x || cursor.x > b.x + b.width || cursor.y < b.y || cursor.y > b.y + b.height) continue;
+          o.window.webContents.send(IPC.cursor, {
+            x: (cursor.x - b.x) / b.width,
+            y: (cursor.y - b.y) / b.height,
+          });
+        }
+      }
     }
     // Screen saver ("pause" mode): check about once a second while idle; it never runs while you type.
     if (s.screenSaver === 'pause' && idleSeconds >= Math.min(idle.timeout, 5) && now - lastScreenSaverCheck >= 1) {

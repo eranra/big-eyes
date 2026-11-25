@@ -43,6 +43,8 @@ export const IPC = {
   saverTime: 'big-eyes:saver-time',
   /** main -> overlay: the blur behind the eyes turns on (true) or off (false). */
   blur: 'big-eyes:blur',
+  /** main -> overlay: the pointer moved; its place on this screen, 0..1 per axis. */
+  cursor: 'big-eyes:cursor',
   /** renderer -> main: one line for the log file. */
   log: 'big-eyes:log',
   /** about window -> main (invoke): app version, platform, update state. */
@@ -117,6 +119,8 @@ export interface BigEyesApi {
   /** Calibrate: all open cameras one by one, or only the camera with this name. */
   onCalibrate(listener: (camera: string | null) => void): void;
   onBlur(listener: (on: boolean) => void): void;
+  /** The pointer moved on this screen (x, y in 0..1, origin top-left). */
+  onCursor(listener: (pos: { x: number; y: number }) => void): void;
   getSaverTime(): Promise<{ seconds: number; source: string } | null>;
   onSaverTime(listener: (time: { seconds: number; source: string } | null) => void): void;
   onFaces(listener: (message: FacesMessage) => void): void;
