@@ -17,7 +17,9 @@ export const DREAM_MAX_GAP = 9;
 
 /**
  * While the eyes sleep, a small star or heart occasionally floats up from beside them.
- * Awake: nothing, and the timer resets so the next sleep waits a full gap first.
+ * Awake: no new bubble (the timer resets, so the next sleep waits a full gap first), and a bubble
+ * that was already floating keeps going until its lifetime ends — the renderer fades it out with
+ * the sleep opacity.
  */
 export class DreamScheduler {
   bubble: DreamBubble | null = null;

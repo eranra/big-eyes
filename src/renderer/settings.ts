@@ -92,7 +92,6 @@ function frame(): void {
   const pose = animator.update(now);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   // The preview is small: scale the eyes like on a screen, limited by the preview height.
-  // The preview is small: scale the eyes like on a screen, limited by the preview height.
   drawEyes(ctx, w, h, pose, frameOptions(now, { irisColor: settings.irisColor, look: settings.look, eyeSize: Math.min(settings.eyeSize, 1.25) }));
 }
 requestAnimationFrame(frame);
