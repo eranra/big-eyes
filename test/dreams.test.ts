@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DreamScheduler } from '../src/core/dreams';
+import { DREAM_LIFETIME, DreamScheduler } from '../src/core/dreams';
 
 describe('DreamScheduler', () => {
   it('spawns nothing while awake', () => {
@@ -37,12 +37,28 @@ describe('DreamScheduler', () => {
     }
   });
 
-  it('waking up resets the timer', () => {
+  it('waking up resets the timer: no new bubble appears at once', () => {
     const d = new DreamScheduler(4);
     for (let t = 0; t < 8; t += 1 / 60) d.update(t, true); // sleeping, maybe a bubble
     for (let t = 8; t < 9; t += 1 / 60) d.update(t, false); // awake
-    // Right after falling asleep again, no instant bubble: the wait starts over.
-    expect(d.update(9.02, true)).toBeNull();
+    // Right after falling asleep again, at most the old fading bubble shows — never a new one.
+    const b = d.update(9.02, true);
+    if (b) expect(b.startTime).toBeLessThan(9);
+  });
+
+  it('a live bubble keeps floating after waking (it fades in the renderer), then is gone', () => {
+    const d = new DreamScheduler(2);
+    let bubble = null;
+    for (let t = 0; t < 12; t += 1 / 60) {
+      bubble = d.update(t, true);
+      if (bubble) break;
+    }
+    expect(bubble).not.toBeNull();
+    const start = bubble!.startTime;
+    // Awake immediately after: the same bubble is still returned, not nulled on the first frame.
+    expect(d.update(start + 0.1, false)?.startTime).toBe(start);
+    // ...and it is gone once its lifetime ends.
+    expect(d.update(start + DREAM_LIFETIME + 0.1, false)).toBeNull();
   });
 
   it('the bubble carries its start time for drawing its age', () => {
@@ -126,5 +142,15 @@ describe('DreamScheduler', () => {
       time: now, // the same absolute clock
     });
     expect(fills.length).toBeGreaterThan(0);
+  });
+
+  it('frameOptions pins the clock contract: the renderer gets the absolute animator time', async () => {
+    const { frameOptions } = await import('../src/renderer/draw');
+    const { defaultSettings } = await import('../src/core/settings');
+    const look = defaultSettings().look;
+    const o = frameOptions(3598.4, { irisColor: '#3d85dc', look, eyeSize: 1 });
+    expect(o.time).toBe(3598.4);
+    expect(o.irisColor).toBe('#3d85dc');
+    expect(o.look).toBe(look);
   });
 });

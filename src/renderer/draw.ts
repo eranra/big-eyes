@@ -28,7 +28,7 @@ export interface DrawOptions {
   eyeSize: number;
   /** Where on the screen the eyes sit. Default center. */
   position?: EyePosition;
-  /** Seconds since start, for the sleep "z" animation. */
+  /** The animator's absolute clock (the same base as the dream and inspiration start times). */
   time: number;
   /** Debug text drawn in the corner, or null. */
   debug?: string | null;
@@ -40,6 +40,15 @@ export interface EyeLayout {
   rx: number;
   ry: number;
   spacing: number;
+}
+
+/**
+ * The draw options for one frame. The renderer must receive the animator's ABSOLUTE clock as `time`
+ * (the same base as dream and inspiration `startTime`s) — building options through this helper
+ * keeps every page on that contract.
+ */
+export function frameOptions(now: number, o: Omit<DrawOptions, 'time'>): DrawOptions {
+  return { ...o, time: now };
 }
 
 /** Width and height factors of each eye shape. */

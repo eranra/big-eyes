@@ -35,11 +35,13 @@ export class DreamScheduler {
     if (!sleeping) {
       if (this.wasSleeping) {
         this.wasSleeping = false;
-        this.bubble = null;
         this.lastSpawn = now;
         this.gap = this.rng.range(5, DREAM_MAX_GAP);
       }
-      return null;
+      // A bubble that was already floating keeps going (it fades out with the sleep opacity
+      // in the renderer); no new one spawns while awake.
+      if (this.bubble && now - this.bubble.startTime > DREAM_LIFETIME) this.bubble = null;
+      return this.bubble;
     }
     if (!this.wasSleeping) {
       this.wasSleeping = true;
