@@ -27,7 +27,41 @@ describe('yawn before sleeping', () => {
     // After the yawn the mouth settles back near the sleeping shape.
     let settled = 1;
     for (let t = 12; t < 13.5; t += 1 / 60) settled = Math.min(settled, a.update(t).mouthOpen);
-    expect(a.pose.mouthOpen).toBeLessThan(0.25);
+    expect(settled).toBeLessThan(0.25);
+  });
+
+  it('the lids droop in two stages: part-closed during the yawn, fully closed only after it', () => {
+    const a = new EyeAnimator(defaultSettings(), 8);
+    let maxLidDuringYawn = 0;
+    let t = 0;
+    while (t < 12) {
+      const pose = a.update(t);
+      if (t >= 8 && t <= 9.6) maxLidDuringYawn = Math.max(maxLidDuringYawn, pose.upperLid);
+      t += 1 / 60;
+    }
+    // During the yawn the eyes stay part-closed (below the sleeping 0.93)...
+    expect(maxLidDuringYawn).toBeLessThan(0.85);
+    // ...and shortly after the yawn they fully close.
+    let lidAfter = 0;
+    for (let u = 12; u < 13.5; u += 1 / 60) lidAfter = Math.max(lidAfter, a.update(u).upperLid);
+    expect(lidAfter).toBeGreaterThan(0.88);
+  });
+
+  it('a person appearing mid-yawn cancels it: awake shapes take over at once', () => {
+    const a = new EyeAnimator(defaultSettings(), 9);
+    let t = 0;
+    let frame = 0;
+    let lidAtEnd = 1;
+    while (t < 10) {
+      // Nobody until 8.5 (sleeping + yawn starts at ~8), then a face appears mid-yawn.
+      if (frame++ % 3 === 0) a.ingest(t >= 8.5 ? [lookingFace()] : [], t);
+      const pose = a.update(t);
+      if (t > 9.2) lidAtEnd = Math.min(lidAtEnd, pose.upperLid);
+      t += 1 / 60;
+    }
+    expect(a.mood).not.toBe('sleeping');
+    // The lid must fall back toward the awake shape, not stay drooped by the yawn.
+    expect(lidAtEnd).toBeLessThan(0.45);
   });
 
   it('a curious mood never yawns', () => {
