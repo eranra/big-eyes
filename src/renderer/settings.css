@@ -299,3 +299,15 @@ body:not(.mac) .mac-only {
 #calibrations .state.ok {
   color: #b9f0a8;
 }
+.row textarea {
+  flex: 1;
+  min-width: 0;
+  min-height: 70px;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 8px;
+  font: inherit;
+  resize: vertical;
+}

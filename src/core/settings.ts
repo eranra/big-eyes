@@ -199,6 +199,8 @@ export interface Settings {
   breakReminderMinutes: number;
   /** Message language: 'he' shows Hebrew, right-to-left. */
   messageLanguage: 'en' | 'he';
+  /** The user's own happy messages, one per line; empty means built-in only. */
+  customMessages: string[];
   attention: AttentionSettings;
   mood: MoodSettings;
 }
@@ -554,6 +556,7 @@ export function defaultSettings(): Settings {
     showHands: false,
     breakReminderMinutes: 45,
     messageLanguage: 'en',
+    customMessages: [],
     mirrorCamera: false,
     respectVideoPlayback: true,
     openAtLogin: false,
@@ -698,6 +701,15 @@ function oneOf<T extends string>(v: unknown, allowed: readonly T[], fallback: T)
   return typeof v === 'string' && (allowed as readonly string[]).includes(v) ? (v as T) : fallback;
 }
 
+/** The user's own messages: valid strings only, trimmed, at most 80 chars each and 100 in total. */
+function customMessages(v: unknown, fallback: string[]): string[] {
+  if (!Array.isArray(v)) return fallback;
+  const clean = v
+    .filter((m): m is string => typeof m === 'string' && m.trim().length > 0)
+    .map((m) => m.trim().slice(0, 80));
+  return [...new Set(clean)].slice(0, 100);
+}
+
 function look(v: unknown, d: LookSettings): LookSettings {
   const l = isObj(v) ? v : {};
   return {
@@ -760,6 +772,7 @@ export function normalizeSettings(input: unknown): Settings {
     showHands: bool(s.showHands, d.showHands),
     breakReminderMinutes: Math.round(num(s.breakReminderMinutes, d.breakReminderMinutes, 0, 240)),
     messageLanguage: oneOf(s.messageLanguage, ['en', 'he'] as const, d.messageLanguage),
+    customMessages: customMessages(s.customMessages, d.customMessages),
     mirrorCamera: bool(s.mirrorCamera, d.mirrorCamera),
     respectVideoPlayback: bool(s.respectVideoPlayback, d.respectVideoPlayback),
     openAtLogin: bool(s.openAtLogin, d.openAtLogin),
