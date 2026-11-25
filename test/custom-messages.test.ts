@@ -21,7 +21,7 @@ describe('custom messages', () => {
   });
 
   it('an empty custom list behaves exactly as before', () => {
-    expect(messagesFor({ customMessages: [] })).toBe(HAPPY_MESSAGES);
+    expect(messagesFor({ messageLanguage: 'en', customMessages: [] })).toBe(HAPPY_MESSAGES);
   });
 
   it('the scheduler draws from the combined list without immediate repeats', async () => {
