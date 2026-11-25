@@ -20,6 +20,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { effectiveMouseRule, IdleMonitor, pointInRects } from '../core/idle';
+import { withinSchedule } from '../core/schedule';
 import { PresenceCheck } from '../core/presence';
 import { ActivityClock } from '../core/activity';
 import { AfterEyesTimer } from '../core/after-eyes';
@@ -601,13 +602,16 @@ async function checkIdle(): Promise<void> {
         return;
       }
     }
-    let blocked = s.paused || screenLocked || overlays.length === 0 || screenSaverActive || afterEyes.handedOff;
+    // Working hours: outside the window the eyes stay away (like paused).
+    const inSchedule = withinSchedule(s, new Date());
+    let blocked = s.paused || screenLocked || overlays.length === 0 || screenSaverActive || afterEyes.handedOff || !inSchedule;
     const reasons: string[] = [];
     if (s.paused) reasons.push('paused');
     if (screenLocked) reasons.push('screen locked');
     if (overlays.length === 0) reasons.push('no screen selected');
     if (screenSaverActive) reasons.push('screen saver running');
     if (afterEyes.handedOff) reasons.push(`handed over to the system (${s.afterEyes === 'lock' ? 'screen locked' : 'screen saver'})`);
+    if (!inSchedule) reasons.push('outside working hours');
     // `canShow` is false after the eyes were dismissed (key, mouse onto the eyes, or look-to-close) until new
     // input, so no camera check runs in that time.
     const due = !blocked && idle.canShow(idleSeconds);

@@ -181,6 +181,15 @@
           <input id="waitWhileWatched" type="checkbox" />
           <span>Wait while someone is looking at the screen (a short camera check before the eyes appear)</span>
         </label>
+        <label class="row check">
+          <input id="scheduleEnabled" type="checkbox" />
+          <span>Working hours only</span>
+        </label>
+        <div class="row">
+          <span>From / to</span>
+          <input id="scheduleStart" type="time" step="300" />
+          <input id="scheduleEnd" type="time" step="300" />
+        </div>
         <div class="row">
           <span>Screen saver</span>
           <select id="screenSaver"></select>
