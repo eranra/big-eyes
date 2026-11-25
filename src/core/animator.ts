@@ -218,6 +218,29 @@ export class EyeAnimator {
     return this.breaks.state();
   }
 
+  // ---- System reactions (charging, screenshot, music) ------------------------------------------
+
+  /** A one-shot reaction ends at this time (0 = none). */
+  private reactionUntil = 0;
+  private reactionKind: 'relieved' | 'squint' | null = null;
+  /** Music playing: the eyes bob gently while true. */
+  private musicOn = false;
+
+  /**
+   * A one-shot reaction to a system event:
+   * - 'relieved' (the power was plugged in): a soft smile and a little exhale, ~2.5 s.
+   * - 'squint' (a screenshot was taken): the lids close briefly, ~1.2 s.
+   */
+  react(kind: 'relieved' | 'squint', now: number): void {
+    this.reactionKind = kind;
+    this.reactionUntil = now + (kind === 'relieved' ? 2.5 : 1.2);
+  }
+
+  /** Music turned on or off; while on, the eyes bob gently. */
+  setMusic(on: boolean): void {
+    this.musicOn = on;
+  }
+
   /** Applies new settings without resetting the animation. */
   apply(settings: Settings): void {
     this.settings = settings;
@@ -351,6 +374,26 @@ export class EyeAnimator {
     // The welcome smiles with the mouth too (after the mood target, so it is not overwritten).
     if (now < this.welcomeUntil && mood !== 'sleeping') {
       this.mouthSmile.target = Math.max(this.mouthSmile.target, 0.3);
+    }
+    // System reactions: relieved (charging) raises a soft smile and a little exhale;
+    // squint (screenshot) closes the lids briefly; music makes the eyes bob gently.
+    if (now < this.reactionUntil && this.reactionKind !== null) {
+      const remain = this.reactionUntil - now;
+      const total = this.reactionKind === 'relieved' ? 2.5 : 1.2;
+      const e = Math.sin((Math.PI * (total - remain)) / total); // 0 -> 1 -> 0
+      if (this.reactionKind === 'relieved') {
+        this.smile.target = Math.max(this.smile.target, 0.25 + e * 0.35);
+        this.browLift.target = Math.max(this.browLift.target, 0.2 + e * 0.2);
+        this.scaleSpring.target -= e * 0.02; // a little exhale
+      } else {
+        this.upperLid.target = Math.max(this.upperLid.target, 0.3 + e * 0.5);
+      }
+    } else {
+      this.reactionKind = null;
+    }
+    if (this.musicOn) {
+      this.scaleSpring.target += Math.sin(now * 2.4) * 0.012;
+      this.smile.target = Math.max(this.smile.target, 0.15);
     }
     // Yawn: as the eyes fall asleep the mouth opens wide once and the lids droop in two stages —
     // droop toward ~0.78 during the yawn, full close only after it ends.

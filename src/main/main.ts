@@ -40,13 +40,16 @@ import {
 import { buildMenuModel, type MenuAction, type MenuNode } from './menu-model';
 import { SettingsStore } from './store';
 import {
+  audioPlaying,
   displaySleepPrevented,
+  isACPower,
   lockScreen,
   macSaverFiles,
   screenSaverRunning,
   setLinuxAutostart,
   startScreenSaver,
   systemScreenSaverTime,
+  watchScreenshots,
 } from './system';
 import * as fsWatch from 'node:fs';
 import { Updater, updateMenuLabel, type UpdateState } from './updater';
@@ -144,6 +147,47 @@ let lastAfterEyesCheck = 0;
 let lastActivityLog = 0;
 /** Last time the cursor place was sent to an overlay (rate limited). */
 let lastCursorSend = 0;
+
+/**
+ * System reactions, sent to every overlay while the eyes are shown:
+ * - the power connecting (battery to AC) -> a relieved smile;
+ * - a screenshot taken -> a squint;
+ * - audio playing in another app -> a gentle bob (on/off).
+ */
+function startSystemReactions(): void {
+  let wasAC: boolean | null = null;
+  let wasMusic = false;
+  const sendToOverlays = (channel: string, value: unknown): void => {
+    for (const o of overlays) if (!o.window.isDestroyed()) o.window.webContents.send(channel, value);
+  };
+  // Power: poll every 30 s; react on the battery -> AC change only.
+  const pollPower = (): void => {
+    void isACPower().then((ac) => {
+      if (wasAC !== null && ac && !wasAC) {
+        eventLog('reaction: relieved (power connected)');
+        sendToOverlays(IPC.reaction, 'relieved');
+      }
+      wasAC = ac;
+    });
+  };
+  pollPower();
+  setInterval(pollPower, 30_000);
+  // Audio: poll every 30 s while the eyes are shown.
+  setInterval(() => {
+    if (!idle.isShowing) return;
+    void audioPlaying(ownPids()).then((playing) => {
+      if (playing !== wasMusic) {
+        wasMusic = playing;
+        sendToOverlays(IPC.music, playing);
+      }
+    });
+  }, 30_000);
+  // Screenshots: watch the folder while the app runs.
+  watchScreenshots(() => {
+    eventLog('reaction: squint (screenshot)');
+    sendToOverlays(IPC.reaction, 'squint');
+  });
+}
 let lastBlockLog = 0;
 /** Whether the overlays are blurred right now. */
 let blurOn = false;
@@ -1125,6 +1169,7 @@ void app.whenReady().then(async () => {
   });
 
   setInterval(() => void checkIdle(), 100);
+
   if (SHOW_AT_START) setTimeout(show, 1200);
   // Testing aid: start camera-by-camera calibration right away.
   if (args.has('--calibrate-now')) setTimeout(() => calibrate(null), 3000);

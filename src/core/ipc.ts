@@ -45,6 +45,10 @@ export const IPC = {
   blur: 'big-eyes:blur',
   /** main -> overlay: the pointer moved; its place on this screen, 0..1 per axis. */
   cursor: 'big-eyes:cursor',
+  /** main -> overlay: a system reaction (charging -> 'relieved', screenshot -> 'squint'). */
+  reaction: 'big-eyes:reaction',
+  /** main -> overlay: another app is playing audio (true) or not (false); the eyes bob gently. */
+  music: 'big-eyes:music',
   /** renderer -> main: one line for the log file. */
   log: 'big-eyes:log',
   /** about window -> main (invoke): app version, platform, update state. */
@@ -121,6 +125,10 @@ export interface BigEyesApi {
   onBlur(listener: (on: boolean) => void): void;
   /** The pointer moved on this screen (x, y in 0..1, origin top-left). */
   onCursor(listener: (pos: { x: number; y: number }) => void): void;
+  /** A system reaction: 'relieved' when the power connects, 'squint' on a screenshot. */
+  onReaction(listener: (kind: 'relieved' | 'squint') => void): void;
+  /** Another app is playing audio (the eyes bob gently while true). */
+  onMusic(listener: (on: boolean) => void): void;
   getSaverTime(): Promise<{ seconds: number; source: string } | null>;
   onSaverTime(listener: (time: { seconds: number; source: string } | null) => void): void;
   onFaces(listener: (message: FacesMessage) => void): void;
