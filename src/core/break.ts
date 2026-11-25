@@ -5,10 +5,19 @@ export const BREAK_NUDGE_SECONDS = 6;
 /** An absence at least this long (s) resets the presence stretch. */
 export const BREAK_RESET_ABSENCE = 20;
 
+/** State that survives the eyes being hidden and shown again (see `seed` / `state`). */
+export interface BreakState {
+  presentSince: number | null;
+  fired: boolean;
+}
+
 /**
  * A gentle health nudge: after `minutes` of continuous presence at the screen, the eyes suggest
  * a stretch. Fires at most once per presence stretch; a real break (an absence of 20 s or more)
  * resets the stretch. `minutes <= 0` turns it off.
+ *
+ * The presence stretch is meant to be continuous across eye sessions (the eyes hide on any
+ * input while the person often stays), so the overlay carries `state()` over recreations.
  */
 export class BreakTimer {
   /** Minutes of continuous presence before the nudge; 0 = off. */
@@ -19,6 +28,17 @@ export class BreakTimer {
 
   constructor(minutes = 0) {
     this.minutes = minutes;
+  }
+
+  /** Carries a stretch over from a previous animator (same window clock). */
+  seed(state: BreakState): void {
+    this.presentSince = state.presentSince;
+    this.fired = state.fired;
+  }
+
+  /** The current stretch, to seed the next animator with. */
+  state(): BreakState {
+    return { presentSince: this.presentSince, fired: this.fired };
   }
 
   /**

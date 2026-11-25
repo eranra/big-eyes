@@ -30,6 +30,8 @@ let frameHandle = 0;
  *  broadcasts in the mirrors). Note: with "Wait while I'm looking" off, no camera runs while the
  *  eyes are hidden, so a hidden stretch always counts as absence — the eyes never saw the person. */
 let lastPersonSeen: number | null = null;
+/** The stretch-reminder state, carried across eye sessions (the eyes hide on input, the person stays). */
+let lastBreakState: { presentSince: number | null; fired: boolean } = { presentSince: null, fired: false };
 
 /** Camera-by-camera calibration: the queue of cameras still to do, the one being recorded, and its samples. */
 let calibrationQueue: Array<{ index: number; label: string; id: string }> = [];
@@ -157,6 +159,7 @@ function setVisible(next: boolean): void {
     const now = performance.now() / 1000;
     animator = new EyeAnimator(settings, (Math.random() * 2 ** 31) | 0, now);
     animator.seedAbsence(lastPersonSeen);
+    animator.seedBreak(lastBreakState);
     animator.wakeUp(now);
     closeRequested = false;
     if (api.role?.guidedTest && !calibrationPending) guidedStart = now;
@@ -296,6 +299,7 @@ function frame(): void {
   if (step) animator.messageOverride = step.text;
   const pose = animator.update(now);
   if (animator.person.isPresent) lastPersonSeen = now;
+  lastBreakState = animator.breakState();
   reportEyeArea(pose, now);
   if (animator.wantsToClose && !closeRequested) {
     closeRequested = true;

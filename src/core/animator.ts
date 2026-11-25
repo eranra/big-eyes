@@ -208,6 +208,16 @@ export class EyeAnimator {
     this.goneSince = goneSince;
   }
 
+  /** Carries the break-reminder stretch over from a previous animator (same window clock). */
+  seedBreak(state: { presentSince: number | null; fired: boolean }): void {
+    this.breaks.seed(state);
+  }
+
+  /** The current break-reminder stretch, to seed the next animator with. */
+  breakState(): { presentSince: number | null; fired: boolean } {
+    return this.breaks.state();
+  }
+
   /** Applies new settings without resetting the animation. */
   apply(settings: Settings): void {
     this.settings = settings;
@@ -263,14 +273,16 @@ export class EyeAnimator {
       this.goneSince ??= now;
     }
     // The stretch nudge: after a long continuous presence, suggest a break. It takes over the
-    // inspiration slot (message, pointing hands, glancing eyes) for its duration.
+    // inspiration slot (message, pointing hands, glancing eyes) for its duration, fading in
+    // and out like the scheduled messages do.
     if (this.breaks.update(now, person.isPresent)) this.nudgeUntil = now + BREAK_NUDGE_SECONDS;
+    const nudgeAge = now - (this.nudgeUntil - BREAK_NUDGE_SECONDS);
     const shownInspiration: ActiveInspiration | null =
       now < this.nudgeUntil
         ? {
             text: BREAK_NUDGE_TEXT,
             position: 'center',
-            opacity: 1,
+            opacity: clamp(Math.min(nudgeAge / 0.6, (this.nudgeUntil - now) / 0.6), 0, 1),
             colorIndex: 0,
             sizeFactor: 1,
             startTime: this.nudgeUntil - BREAK_NUDGE_SECONDS,
@@ -287,7 +299,7 @@ export class EyeAnimator {
     // Never during the goodbye wink: the person just left, and the eyes are saying bye.
     const cursorGlance = this.cursor.update(now, person.isPresent || this.goodbyeAt !== null);
 
-    if (this.inspirationGaze && (now < this.inspirationGlanceUntil || inspiration)) {
+    if (this.inspirationGaze && (now < this.inspirationGlanceUntil || shownInspiration)) {
       const gazeTarget = this.inspirationGaze;
       const tremor = { x: Math.sin(now * 13.1 + this.phase) * 0.006, y: Math.cos(now * 11.3 + this.phase) * 0.006 };
       this.gaze.setTarget(add(gazeTarget, tremor));
