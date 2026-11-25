@@ -2,6 +2,7 @@ import type { EyePose } from '../core/animator';
 import type { DreamBubble } from '../core/dreams';
 import { DREAM_LIFETIME } from '../core/dreams';
 import { INSPIRATION_COLORS } from '../core/inspirations';
+import type { Season } from '../core/season';
 import { clampLength, lerp, smoothstep } from '../core/math';
 import { THEMES, type EyePosition, type LookSettings } from '../core/settings';
 
@@ -32,6 +33,8 @@ export interface DrawOptions {
   time: number;
   /** Debug text drawn in the corner, or null. */
   debug?: string | null;
+  /** Seasonal background sparkle, or null for none. */
+  season?: Season | null;
 }
 
 export interface EyeLayout {
@@ -49,6 +52,65 @@ export interface EyeLayout {
  */
 export function frameOptions(now: number, o: Omit<DrawOptions, 'time'>): DrawOptions {
   return { ...o, time: now };
+}
+
+/**
+ * Seasonal sparkle behind the eyes: snowflakes drift down in December, leaves in autumn,
+ * hearts rise on February 14. Deterministic from the time, subtle, never covers the eyes.
+ */
+export function drawSeason(ctx: CanvasRenderingContext2D, width: number, height: number, time: number, season: Season | null): void {
+  if (!season) return;
+  const COUNT = 14;
+  // A stable pseudo-random per particle, so they do not jump around between frames.
+  const hash = (i: number): number => {
+    const x = Math.sin(i * 127.1 + 311.7) * 43758.5453;
+    return x - Math.floor(x);
+  };
+  ctx.save();
+  for (let i = 0; i < COUNT; i++) {
+    const h1 = hash(i);
+    const h2 = hash(i + 50);
+    const speed = 18 + h1 * 22; // pixels per second
+    const size = 3 + h2 * 4;
+    let x: number;
+    let y: number;
+    if (season === 'hearts') {
+      x = (h1 * 1.3 + Math.sin(time * 0.7 + i) * 0.015) * width;
+      y = height + 20 - ((time * speed + h2 * height) % (height + 60));
+    } else {
+      x = (h1 + Math.sin(time * 0.5 + i * 2.1) * 0.02) * width;
+      y = ((time * speed + h2 * height) % (height + 40)) - 20;
+    }
+    const alpha = 0.1 + h2 * 0.14;
+    ctx.globalAlpha = alpha;
+    if (season === 'snow') {
+      ctx.fillStyle = 'rgb(235, 240, 250)';
+      ctx.beginPath();
+      ctx.arc(x, y, size * 0.55, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (season === 'leaves') {
+      ctx.fillStyle = i % 3 === 0 ? 'rgb(200, 120, 60)' : i % 3 === 1 ? 'rgb(170, 90, 50)' : 'rgb(150, 110, 45)';
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(time * (0.5 + h1) + i);
+      ctx.beginPath();
+      ctx.ellipse(0, 0, size, size * 0.45, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    } else {
+      ctx.fillStyle = 'rgba(230, 90, 130, 1)';
+      ctx.save();
+      ctx.translate(x, y);
+      const w = size * 0.6;
+      ctx.beginPath();
+      ctx.moveTo(0, w * 0.4);
+      ctx.bezierCurveTo(-w, -w * 0.3, -w * 0.45, -w, 0, -w * 0.45);
+      ctx.bezierCurveTo(w * 0.45, -w, w, -w * 0.3, 0, w * 0.4);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+  ctx.restore();
 }
 
 /** Width and height factors of each eye shape. */
@@ -134,6 +196,7 @@ export function shade(hex: string, amount: number, alpha = 1): string {
 export function drawEyes(ctx: CanvasRenderingContext2D, width: number, height: number, pose: EyePose, o: DrawOptions): void {
   const look = o.look ?? DEFAULT_LOOK;
   ctx.clearRect(0, 0, width, height);
+  if (o.season) drawSeason(ctx, width, height, o.time, o.season);
   const l = eyeLayout(width, height, pose, o.eyeSize, look, o.position);
   if (look.glowStrength > 0) drawGlow(ctx, l, look.glowColor, look.glowStrength);
   if (pose.closeProgress > 0.01) drawCloseRing(ctx, l, pose.closeProgress, look.glowColor);
