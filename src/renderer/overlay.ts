@@ -3,6 +3,7 @@ import { averageReference } from '../core/attention';
 import type { BigEyesApi } from '../core/ipc';
 import { defaultSettings, type GazeReference, type Settings } from '../core/settings';
 import { drawEyes, eyeBounds, eyeLayout, frameOptions } from './draw';
+import { seasonFor } from '../core/season';
 import { FaceTracker } from './tracker';
 
 declare global {
@@ -318,6 +319,7 @@ function frame(): void {
       eyeSize: settings.eyeSize,
       position: settings.position,
       debug: settings.showDebugInfo ? debugText() : null,
+      season: seasonFor(new Date()),
     }),
   );
 }
