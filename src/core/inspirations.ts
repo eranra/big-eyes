@@ -59,9 +59,16 @@ export const HAPPY_MESSAGES_HE: readonly string[] = [
 
 export type InspirationPosition = 'top' | 'bottom' | 'center';
 
-/** The message list for a language: Hebrew for 'he', English otherwise. */
-export function messagesFor(s: Pick<InspirationSettings, 'messageLanguage'>): readonly string[] {
-  return s.messageLanguage === 'he' ? HAPPY_MESSAGES_HE : HAPPY_MESSAGES;
+/** The message list for a language, with the user's own messages added. */
+export function messagesFor(
+  s: Pick<InspirationSettings, 'messageLanguage'> & { customMessages?: readonly string[] },
+): readonly string[] {
+  const base = s.messageLanguage === 'he' ? HAPPY_MESSAGES_HE : HAPPY_MESSAGES;
+  const custom = s.customMessages ?? [];
+  if (!custom.length) return base;
+  const seen = new Set(base);
+  const extras = custom.filter((m) => !seen.has(m) && Boolean(seen.add(m)));
+  return [...base, ...extras];
 }
 
 export interface InspirationSettings {
@@ -70,6 +77,8 @@ export interface InspirationSettings {
   inspirationsDuration: number;
   /** Message language: 'he' shows the Hebrew list, right-to-left. */
   messageLanguage: 'en' | 'he';
+  /** The user's own messages, added to the built-in list. */
+  customMessages: string[];
 }
 
 export interface ActiveInspiration {
@@ -180,14 +189,17 @@ export class InspirationScheduler {
       idx = Math.floor(this.rng.next() * messages.length);
     } while (messages.length > 1 && idx === this.lastIndex);
     this.lastIndex = idx;
+    const text = messages[idx]!;
     this.active = {
-      text: messages[idx]!,
+      text,
       position: this.rng.pick([...INSPIRATION_POSITIONS]),
       opacity: 0,
       colorIndex: Math.floor(this.rng.next() * INSPIRATION_COLORS.length),
       sizeFactor: this.rng.range(1.15, 1.6),
       startTime: now,
-      rtl: this.settings.messageLanguage === 'he',
+      // Right-to-left per message, not per language: a Hebrew custom message renders correctly
+      // even in English mode, and an English one in Hebrew mode stays left-to-right.
+      rtl: /[\u0590-\u05FF]/.test(text),
     };
     this.phase = 'showing';
     this.phaseStart = now;

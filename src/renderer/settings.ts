@@ -342,6 +342,17 @@ for (const p of BREAK_PRESETS) breakSelect.append(new Option(p.label, String(p.v
 breakSelect.addEventListener('change', () => save({ breakReminderMinutes: Number(breakSelect.value) }, 0));
 const languageSelect = $<HTMLSelectElement>('messageLanguage');
 languageSelect.addEventListener('change', () => save({ messageLanguage: languageSelect.value }, 0));
+const customArea = $<HTMLTextAreaElement>('customMessages');
+const customMessagesValue = (): string[] => customArea.value.split('\n').map((l) => l.trim()).filter(Boolean);
+customArea.addEventListener('input', () => save({ customMessages: customMessagesValue() }, 500));
+// Leaving the field saves at once (the shared save timer could be cancelled by another
+// control) and writes the normalized value back, so limits are visible.
+customArea.addEventListener('blur', () => {
+  void api.updateSettings({ customMessages: customMessagesValue() }).then((s) => {
+    customArea.value = s.customMessages.join('\n');
+    render(s);
+  });
+});
 const blurStrength = $<HTMLInputElement>('blurStrength');
 blurStrength.addEventListener('input', () => {
   (blurStrength.nextElementSibling as HTMLOutputElement).value = `${Math.round(Number(blurStrength.value) * 100)}%`;
@@ -394,6 +405,7 @@ function renderBehavior(next: Settings): void {
   }
   breakSelect.value = String(next.breakReminderMinutes);
   languageSelect.value = next.messageLanguage;
+  if (document.activeElement !== customArea) customArea.value = next.customMessages.join('\n');
   afterEyesSelect.value = next.afterEyes;
   afterEyesSelect.disabled = next.screenSaver !== 'replace';
   const preset = AFTER_EYES_DELAY_PRESETS.some((p) => p.value === next.afterEyesMinutes);
