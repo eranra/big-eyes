@@ -57,7 +57,11 @@ if (tracker) {
   tracker.onFaces = (faces, time, cameras) => {
     const openCameras = tracker.openCameras;
     animator.setCameras(openCameras);
-    if (presenceActive && !visible) api.sendPresenceFaces({ faces, cameras, openCameras });
+    if (presenceActive && !visible) {
+      // Someone is reading in front of the hidden eyes: that is not an absence.
+      if (faces.length) lastPersonSeen = time;
+      api.sendPresenceFaces({ faces, cameras, openCameras });
+    }
     if (settings.showDebugInfo && time - lastLog > 1) {
       lastLog = time;
       const f = faces[0];

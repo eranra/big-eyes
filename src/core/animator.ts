@@ -300,7 +300,6 @@ export class EyeAnimator {
       this.smile.target = Math.max(this.smile.target, 0.7);
       this.browLift.target = Math.max(this.browLift.target, 0.55);
       this.pupil.target = Math.max(this.pupil.target, 1.25);
-      this.mouthSmile.target = Math.max(this.mouthSmile.target, 0.3);
     }
     // Mouth: follows the mood. When delighted it mirrors how much the person smiles, with a small "talking" wobble.
     const delighted = mood === 'delighted';
@@ -309,6 +308,10 @@ export class EyeAnimator {
     this.mouthOpen.target = shape.mouth.open * (delighted ? 0.6 + 0.4 * mirror : 1) + (delighted ? Math.sin(now * 7.3) * 0.05 : 0);
     this.mouthWidth.target = shape.mouth.width * (delighted ? 0.9 + 0.15 * mirror : 1);
     this.mouthAlpha.target = this.settings.look.showMouth ? 1 : 0;
+    // The welcome smiles with the mouth too (after the mood target, so it is not overwritten).
+    if (now < this.welcomeUntil && mood !== 'sleeping') {
+      this.mouthSmile.target = Math.max(this.mouthSmile.target, 0.3);
+    }
     // Yawn: as the eyes fall asleep the mouth opens wide once and the lids droop in two stages —
     // droop toward ~0.78 during the yawn, full close only after it ends.
     if (this.yawnStart !== null) {

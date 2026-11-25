@@ -26,6 +26,8 @@ describe('wake-up personality', () => {
     // The welcome still shows: a big smile within the first second.
     expect(a.pose.smile).toBeGreaterThan(0.5);
     expect(a.pose.browLift).toBeGreaterThan(0.3);
+    // ...and the mouth smiles with it (the bored frown must not show through).
+    expect(a.pose.mouthSmile).toBeGreaterThan(0.25);
   });
 
   it('a short absence gets the normal reaction: no welcome without eye contact', () => {
@@ -44,6 +46,7 @@ describe('wake-up personality', () => {
     simulate(a, [awayFace()], 360, 4); // person stays but never makes eye contact
     // After the welcome window the smile falls back toward the bored/curious range.
     expect(a.pose.smile).toBeLessThan(0.45);
+    expect(a.pose.mouthSmile).toBeLessThan(0.1);
   });
 
   it('a normal return with eye contact is unaffected (happy as always)', () => {
