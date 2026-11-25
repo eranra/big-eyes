@@ -127,4 +127,27 @@ describe('CursorGlancer', () => {
     }
     expect(glanced).toBe(false); // the resume waits, it does not burst
   });
+
+  it('no cursor glance during the goodbye wink', async () => {
+    const { EyeAnimator, defaultSettings, mergeSettings } = await import('../src/core');
+    const { lookingFace } = await import('./helpers');
+    const s = mergeSettings(defaultSettings(), { lookToClose: true, lookToCloseSeconds: 0.5 });
+    const a = new EyeAnimator(s, 14);
+    // Hold eye contact until the goodbye starts (0.5 s look time).
+    let t = 0;
+    let frame = 0;
+    while (t < 3 && !a.wantsToClose) {
+      if (frame++ % 3 === 0) a.ingest([lookingFace()], t);
+      a.update(t);
+      t += 1 / 60;
+    }
+    expect(a.wantsToClose).toBe(true); // the goodbye wink is running now
+    // The person is gone and the cursor moves — no glance may start during the wink.
+    let glanced = false;
+    for (let u = t; u < t + 0.5; u += 1 / 60) {
+      if (Math.round(u * 60) % 30 === 0) a.cursor.noteCursor(0.95, 0.5, u);
+      if (a.update(u).gaze.x > 0.8) glanced = true;
+    }
+    expect(glanced).toBe(false);
+  });
 });
