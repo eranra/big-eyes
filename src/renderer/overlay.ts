@@ -320,6 +320,8 @@ function frame(): void {
 
 // The main process turns the blur on when the screen saver time is reached (or at once in "always" mode).
 api.onBlur((on) => document.body.classList.toggle('blur', on));
+// The eyes watch the cursor while nobody is in front of the camera.
+api.onCursor((pos) => animator.cursor.noteCursor(pos.x, pos.y, performance.now() / 1000));
 api.onSettings(applySettings);
 api.onVisibility(setVisible);
 api.onCalibrate((camera) => {

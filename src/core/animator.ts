@@ -4,6 +4,7 @@ import { BlinkScheduler } from './blink';
 import type { FaceObservation } from './face';
 import { HandScheduler, type HandPose, type HandSettings } from './hand';
 import { DreamScheduler, type DreamBubble } from './dreams';
+import { CursorGlancer } from './cursor';
 import { InspirationScheduler, type ActiveInspiration, type InspirationSettings } from './inspirations';
 import { add, clamp, clampLength, lerpVec, scale, SeededRandom, type Vec2 } from './math';
 import { MoodMachine, type Mood } from './mood';
@@ -151,6 +152,7 @@ export class EyeAnimator {
   readonly inspirations: InspirationScheduler;
   readonly hands: HandScheduler;
   readonly dreams: DreamScheduler;
+  readonly cursor: CursorGlancer;
   private fixation: Vec2 = { x: 0, y: 0 };
   private nextSaccadeAt = 0;
   private captionText = '';
@@ -182,6 +184,7 @@ export class EyeAnimator {
     this.inspirations = new InspirationScheduler(settings as InspirationSettings, seed + 2);
     this.hands = new HandScheduler(settings as unknown as HandSettings, seed + 3);
     this.dreams = new DreamScheduler(seed + 4);
+    this.cursor = new CursorGlancer(seed + 5);
     this.startTime = now;
     this.phase = this.rng.range(0, Math.PI * 2);
     this.pose = this.buildPose(0);
@@ -260,6 +263,9 @@ export class EyeAnimator {
 
     this.updateFixation(person, mood, now, inspiration);
 
+    // When nobody is there, the eyes occasionally glance toward the cursor instead.
+    const cursorGlance = this.cursor.update(now, person.isPresent);
+
     if (this.inspirationGaze && (now < this.inspirationGlanceUntil || inspiration)) {
       const gazeTarget = this.inspirationGaze;
       const tremor = { x: Math.sin(now * 13.1 + this.phase) * 0.006, y: Math.cos(now * 11.3 + this.phase) * 0.006 };
@@ -267,7 +273,7 @@ export class EyeAnimator {
     } else {
       if (now >= this.inspirationGlanceUntil) this.inspirationGaze = null;
       const tremor = { x: Math.sin(now * 13.1 + this.phase) * 0.006, y: Math.cos(now * 11.3 + this.phase) * 0.006 };
-      this.gaze.setTarget(add(this.fixation, tremor));
+      this.gaze.setTarget(add(cursorGlance ?? this.fixation, tremor));
     }
     this.gaze.step(dt);
 
