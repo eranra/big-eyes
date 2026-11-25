@@ -25,6 +25,8 @@ let settings: Settings = defaultSettings();
 let animator = new EyeAnimator(settings, (Math.random() * 2 ** 31) | 0, performance.now() / 1000);
 let visible = false;
 let frameHandle = 0;
+/** When the person was last seen, kept across eye sessions so a long time away still welcomes them back. */
+let lastPersonSeen: number | null = null;
 
 /** Camera-by-camera calibration: the queue of cameras still to do, the one being recorded, and its samples. */
 let calibrationQueue: Array<{ index: number; label: string; id: string }> = [];
@@ -140,9 +142,11 @@ function setVisible(next: boolean): void {
   visible = next;
   document.body.classList.toggle('visible', next);
   if (next) {
-    // A fresh animator each time, so the eyes wake up from closed.
+    // A fresh animator each time, so the eyes wake up from closed. The time the person was last
+    // seen carries over, so a return after a long hidden stretch still gets the warm welcome.
     const now = performance.now() / 1000;
     animator = new EyeAnimator(settings, (Math.random() * 2 ** 31) | 0, now);
+    animator.seedAbsence(lastPersonSeen);
     animator.wakeUp(now);
     closeRequested = false;
     if (api.role?.guidedTest && !calibrationPending) guidedStart = now;
@@ -281,6 +285,7 @@ function frame(): void {
   const step = guidedStep(now);
   if (step) animator.messageOverride = step.text;
   const pose = animator.update(now);
+  if (animator.person.isPresent) lastPersonSeen = now;
   reportEyeArea(pose, now);
   if (animator.wantsToClose && !closeRequested) {
     closeRequested = true;

@@ -195,6 +195,11 @@ export class EyeAnimator {
     return this.attention.state;
   }
 
+  /** Called when the overlay appears: the eyes were hidden while the person was last seen at this time. */
+  seedAbsence(goneSince: number | null): void {
+    this.goneSince = goneSince;
+  }
+
   /** Applies new settings without resetting the animation. */
   apply(settings: Settings): void {
     this.settings = settings;
@@ -295,6 +300,7 @@ export class EyeAnimator {
       this.smile.target = Math.max(this.smile.target, 0.7);
       this.browLift.target = Math.max(this.browLift.target, 0.55);
       this.pupil.target = Math.max(this.pupil.target, 1.25);
+      this.mouthSmile.target = Math.max(this.mouthSmile.target, 0.3);
     }
     // Mouth: follows the mood. When delighted it mirrors how much the person smiles, with a small "talking" wobble.
     const delighted = mood === 'delighted';

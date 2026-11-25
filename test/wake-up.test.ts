@@ -53,4 +53,35 @@ describe('wake-up personality', () => {
     expect(a.mood).toBe('happy');
     expect(a.pose.smile).toBeGreaterThan(0.5);
   });
+
+  it('a person present in the very first frame gets no welcome', () => {
+    // The eyes appear after long idle but the person was there all along (e.g. reading).
+    const a = new EyeAnimator(defaultSettings(), 5, 600);
+    simulate(a, [awayFace()], 600, 1.2);
+    expect(a.person.isPresent).toBe(true);
+    expect(a.pose.smile).toBeLessThan(0.35);
+  });
+
+  it('a short detection gap (inside the absence grace) does not restart the absence clock', () => {
+    const a = new EyeAnimator(defaultSettings(), 6);
+    // Person present for 6 minutes with a 1 s dropout in the middle (grace is 1.2 s).
+    let t = 0;
+    let frame = 0;
+    while (t < 360) {
+      const gap = t > 180 && t <= 181;
+      if (frame++ % 3 === 0) a.ingest(gap ? [] : [awayFace()], t);
+      a.update(t);
+      t += 1 / 60;
+    }
+    simulate(a, [awayFace()], 360, 1.2);
+    expect(a.pose.smile).toBeGreaterThan(0.5); // ~359 s of real presence still counts as "away"
+  });
+
+  it('a seeded absence from a previous eye session carries into a fresh animator', () => {
+    // The eyes were hidden for 10 minutes (screen saver); the person returns now.
+    const a = new EyeAnimator(defaultSettings(), 7, 1000);
+    a.seedAbsence(400); // last seen 600 s ago
+    simulate(a, [awayFace()], 1000, 1.2);
+    expect(a.pose.smile).toBeGreaterThan(0.5);
+  });
 });
