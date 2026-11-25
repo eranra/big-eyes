@@ -195,6 +195,8 @@ export interface Settings {
   inspirationsDuration: number;
   /** Cartoon hands at the bottom edge. */
   showHands: boolean;
+  /** Minutes of continuous presence before a stretch nudge; 0 = off. */
+  breakReminderMinutes: number;
   attention: AttentionSettings;
   mood: MoodSettings;
 }
@@ -548,6 +550,7 @@ export function defaultSettings(): Settings {
     inspirationsInterval: 10,
     inspirationsDuration: 8,
     showHands: false,
+    breakReminderMinutes: 45,
     mirrorCamera: false,
     respectVideoPlayback: true,
     openAtLogin: false,
@@ -752,6 +755,7 @@ export function normalizeSettings(input: unknown): Settings {
     inspirationsInterval: num(s.inspirationsInterval, d.inspirationsInterval, 3, 120),
     inspirationsDuration: num(s.inspirationsDuration, d.inspirationsDuration, 1, 30),
     showHands: bool(s.showHands, d.showHands),
+    breakReminderMinutes: Math.round(num(s.breakReminderMinutes, d.breakReminderMinutes, 0, 240)),
     mirrorCamera: bool(s.mirrorCamera, d.mirrorCamera),
     respectVideoPlayback: bool(s.respectVideoPlayback, d.respectVideoPlayback),
     openAtLogin: bool(s.openAtLogin, d.openAtLogin),

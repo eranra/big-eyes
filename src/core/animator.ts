@@ -5,6 +5,7 @@ import type { FaceObservation } from './face';
 import { HandScheduler, type HandPose, type HandSettings } from './hand';
 import { DreamScheduler, type DreamBubble } from './dreams';
 import { CursorGlancer } from './cursor';
+import { BreakTimer, BREAK_NUDGE_SECONDS, BREAK_NUDGE_TEXT } from './break';
 import { InspirationScheduler, type ActiveInspiration, type InspirationSettings } from './inspirations';
 import { add, clamp, clampLength, lerpVec, scale, SeededRandom, type Vec2 } from './math';
 import { MoodMachine, type Mood } from './mood';
@@ -153,6 +154,9 @@ export class EyeAnimator {
   readonly hands: HandScheduler;
   readonly dreams: DreamScheduler;
   readonly cursor: CursorGlancer;
+  readonly breaks: BreakTimer;
+  /** While `now < nudgeUntil` the stretch nudge message is shown. */
+  private nudgeUntil = 0;
   private fixation: Vec2 = { x: 0, y: 0 };
   private nextSaccadeAt = 0;
   private captionText = '';
@@ -185,6 +189,7 @@ export class EyeAnimator {
     this.hands = new HandScheduler(settings as unknown as HandSettings, seed + 3);
     this.dreams = new DreamScheduler(seed + 4);
     this.cursor = new CursorGlancer(seed + 5);
+    this.breaks = new BreakTimer(settings.breakReminderMinutes);
     this.startTime = now;
     this.phase = this.rng.range(0, Math.PI * 2);
     this.pose = this.buildPose(0);
@@ -209,6 +214,7 @@ export class EyeAnimator {
     this.attention.apply(settings.attention, settings.mirrorCamera, settings.calibrations);
     this.moods.settings = settings.mood;
     this.inspirations.settings = settings as InspirationSettings;
+    this.breaks.minutes = settings.breakReminderMinutes;
     this.hands.settings = settings as unknown as HandSettings;
   }
 
@@ -256,12 +262,26 @@ export class EyeAnimator {
     } else {
       this.goneSince ??= now;
     }
+    // The stretch nudge: after a long continuous presence, suggest a break. It takes over the
+    // inspiration slot (message, pointing hands, glancing eyes) for its duration.
+    if (this.breaks.update(now, person.isPresent)) this.nudgeUntil = now + BREAK_NUDGE_SECONDS;
+    const shownInspiration: ActiveInspiration | null =
+      now < this.nudgeUntil
+        ? {
+            text: BREAK_NUDGE_TEXT,
+            position: 'center',
+            opacity: 1,
+            colorIndex: 0,
+            sizeFactor: 1,
+            startTime: this.nudgeUntil - BREAK_NUDGE_SECONDS,
+          }
+        : inspiration;
     const prevInsp = this.pose.inspiration;
-    if (inspiration && (!prevInsp || inspiration.text !== prevInsp.text)) {
-      this.startInspirationGlance(inspiration, now);
+    if (shownInspiration && (!prevInsp || shownInspiration.text !== prevInsp.text)) {
+      this.startInspirationGlance(shownInspiration, now);
     }
 
-    this.updateFixation(person, mood, now, inspiration);
+    this.updateFixation(person, mood, now, shownInspiration);
 
     // When nobody is there, the eyes occasionally glance toward the cursor instead.
     // Never during the goodbye wink: the person just left, and the eyes are saying bye.
@@ -377,13 +397,13 @@ export class EyeAnimator {
     this.sleepBubble.target = mood === 'sleeping' ? 1 : 0;
     this.sleepBubble.step(dt);
 
-    const handPose = this.hands.update(now, mood, inspiration, this.settings.showHands);
+    const handPose = this.hands.update(now, mood, shownInspiration, this.settings.showHands);
     const dream = this.dreams.update(now, mood === 'sleeping');
     const mouthAlive =
       Math.sin(now * 1.1 + this.phase) * 0.015 + Math.sin(now * 0.53 + this.phase * 1.3) * 0.008;
     const breathing =
       Math.sin(t * (mood === 'sleeping' ? 1.1 : 1.6) + this.phase) * (mood === 'sleeping' ? 0.018 : 0.008);
-    this.pose = this.buildPose(blink, breathing, inspiration, mouthAlive, handPose, dream);
+    this.pose = this.buildPose(blink, breathing, shownInspiration, mouthAlive, handPose, dream);
     return this.pose;
   }
 
