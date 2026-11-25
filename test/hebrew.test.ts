@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { HAPPY_MESSAGES_HE, messagesFor } from '../src/core/inspirations';
+import { HAPPY_MESSAGES, HAPPY_MESSAGES_HE, messagesFor } from '../src/core/inspirations';
 
 describe('Hebrew messages', () => {
   it('has a full Hebrew list', () => {
     expect(HAPPY_MESSAGES_HE.length).toBeGreaterThanOrEqual(20);
     for (const m of HAPPY_MESSAGES_HE) expect(m.length).toBeGreaterThan(2);
     expect(HAPPY_MESSAGES_HE).toContain('אתה מדהים!');
+    // Parallel to the English list, and Hebrew-only characters plus neutral punctuation:
+    // a stray Latin letter or digit would break the right-to-left rendering assumption.
+    expect(HAPPY_MESSAGES_HE.length).toBe(HAPPY_MESSAGES.length);
+    for (const m of HAPPY_MESSAGES_HE) expect(m).toMatch(/^[\u0590-\u05FF\s!—,'?]+$/);
   });
 
   it('messagesFor picks the list by language', async () => {
@@ -47,6 +51,32 @@ describe('Hebrew messages', () => {
     }
     expect(message).not.toBeNull();
     expect(message!.rtl).toBe(false);
+  });
+
+  it('switching the language mid-run: the next message comes from the new list with matching rtl', async () => {
+    const { InspirationScheduler, HAPPY_MESSAGES, HAPPY_MESSAGES_HE } = await import('../src/core/inspirations');
+    const { defaultSettings, mergeSettings } = await import('../src/core/settings');
+    const s = mergeSettings(defaultSettings(), { inspirationsInterval: 3, inspirationsDuration: 5 });
+    const sched = new InspirationScheduler(s, 9);
+    // An English message shows.
+    let first = null;
+    for (let t = 0; t < 10; t += 1 / 60) {
+      first = sched.update(t, true);
+      if (first) break;
+    }
+    expect(first).not.toBeNull();
+    expect(HAPPY_MESSAGES).toContain(first!.text);
+    expect(first!.rtl).toBe(false);
+    // The user switches to Hebrew mid-run.
+    sched.settings = { ...sched.settings, messageLanguage: 'he' };
+    let next = null;
+    for (let t = 20; t < 40; t += 1 / 60) {
+      next = sched.update(t, true);
+      if (next && next.text !== first!.text) break;
+    }
+    expect(next).not.toBeNull();
+    expect(HAPPY_MESSAGES_HE).toContain(next!.text);
+    expect(next!.rtl).toBe(true);
   });
 
   it('drawInspiration renders right-to-left text in rtl direction', async () => {
